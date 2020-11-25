@@ -1,0 +1,266 @@
+---
+title: "Ejercicios visualizacion con ggplot2-data set diamonds"
+output:
+  html_document:
+    df_print: paged
+  html_notebook: default
+  pdf_document: default
+Source: Source
+---
+
+
+
+El paquete ggplot2 permite definir gráficos de forma eficiente, elegante y sencilla.
+
+El paquete ggplot2 proporciona una buena estética aunque no se pueden realizar gráficos tridimensionales o interactivos.
+La idea básica: especificar de forma independiente los bloques de construcción y combinarlos para crear prácticamente cualquier tipo de visualización gráfica que se desee.
+Los bloques de construcción de un gráfico incluyen:
+* Datos
+* Mapeo estético
+* Transformaciones estadísticas
+* Escalas
+* Sistema de coordenadas
+* Ajustes de posición
+* Aspecto
+
+
+Los datos deben estar siempre en una variable de tipo data.frame.
+
+Lo primero que tenemos que hacer es cargar la libreria ggplot2: 
+
+
+```{r}
+library("ggplot2")
+```
+
+Para ir descubriendo paso a paso cómo debemos indicar las características del gráfico vamos a trabajar con los datos diamonds del paquete ggplot2. Tiene estructura de data.frame y variables numéricas y categóricas. 
+
+Vamos a cargar el data set con la función data, y después mostraremos el contenido de las primeras filas de este data set además de ver su estructura:
+
+```{r}
+
+data(diamonds)
+head(diamonds)
+
+str(diamonds)
+
+nrow(diamonds)
+```
+
+
+Este dataset tiene10 variables y 53,940 elementos. Las variables son las siguientes:
+
+* Price : Price in US dollars ($326-$18,823)
+* Carat : Weight of the diamond (0.2-5.01)
+* Cut : Quality of the cut (Fair, Good, Very Good, Premium, Ideal)
+* Color : Diamond colour, from J (worst) to D (best)
+* Clarity : A measurement of how clear the diamond is (I1 (worst), SI1, SI2, VS1, VS2, VVS1, VVS2, IF (best))
+* X : Length in mm (0-10.74)
+* Y : Width in mm (0-58.9)
+* Z : Depth in mm (0-31.8)
+* Depth : Total depth percentage = (z / mean(x, y)) = (2 * z / (x + y) (43-79))
+* Table : Width of top of diamond relative to widest point (43-95)
+
+A continuación, vamos a visualizar la información de este data set utilizando la librería ggplot2 y sus componentes 
+
+# La configuración (aes)
+
+La principal característica de la estructura ggplot2 es la forma en que se hacen tramas de gráficos mediante la adición de “capas”. 
+
+Lo primero hay que especificar a la función ggplot qué conjunto de datos (o dataset)
+debe utilizar. Esto se hace escribiendo ggplot(df), donde df es un dataframe que contiene todas las características necesarias para hacer la trama. 
+
+El argumento aes() es sinónimo de estética, ggplot2 considera que el eje X e Y de la gráfica es estético, junto con el color, el tamaño, la forma, el relleno, etc. 
+Se puede agregar cualquier estética que se desee dentro del argumento aes(), como por ejemplo indicar los ejes X e Y, especificando las variables respectivas del conjunto de datos. 
+La variable en función de la cual el color, tamaño, forma y trazo debe cambiar también se puede especificar aquí mismo. La estética especificada aquí será heredada por todas las capas geom que se agregarán posteriormente.
+
+
+
+Empezaremos definiendo el dataframe a usar y el eje X e Y. Todavía no veremos ningún gráfico con esta instrucción. 
+```{r  }
+ggplot(diamonds, aes(x=carat, y=price))
+```
+
+#Las capas (geom)
+Las capas de ggplot2 también se denominan geom. Las capas geom_ representan los elementos que se ven en el gráfico: puntos geom_point(), líneas, geom_line(), diagramas de cajas geom_boxplot(), etc.
+
+Dibujaremos un diagrama de dispersión en la que cada categoría de la variable “cut” tendrá un color diferente.
+
+```{r  }
+ggplot(diamonds, aes(x=carat, y=price, colour = cut)) + geom_point()
+
+```
+
+Una vez que la configuración de base se hace, se pueden agregar los geoms uno encima del otro.
+
+Por ejemplo, vamos a agregar la geometría de puntos y otra de suavizado.
+
+```{r  }
+ggplot(diamonds, aes(x=carat, y=price, colour = cut)) + geom_point() + geom_smooth()
+
+```
+
+
+Hemos añadido dos capas (geoms) a esta gráfica: geom_point() y geom_smooth(). Dado que el eje Y, el eje X y el color se definieron en la propia configuración del ggplot, en aes(), estas dos capas heredaron
+esa estética.
+Como alternativa, se puede especificar las estéticas dentro de la capa geom, como se muestra a continuación.
+
+```{r }
+
+ggplot(diamonds, aes(x=carat, y=price, colour = cut)) + geom_point() + geom_smooth(aes(x=carat, y=price, colour = cut))
+
+```
+Hemos realizado el mismo gráfico escribiendo las ordenes de dos formas diferentes. Observa el eje X e Y y cómo el color de los puntos varía en función del valor de la variable de corte. La leyenda se agregó automáticamente. Sin embargo, si en lugar de tener múltiples líneas de suavizado para cada nivel de corte, queremos integrarlos todos bajo una sola línea, debemos quitar la estética del color de la capa de *geom_smooth()*, así:
+
+```{r  }
+ggplot(diamonds, aes(x=carat, y=price)) + geom_point(aes(colour = cut)) + geom_smooth()
+
+
+```
+
+
+Ahora vamos a hacer que la forma de los puntos cambie con la característica “color” del conjunto de datos.
+
+```{r  }
+ggplot(diamonds, aes(x=carat, y=price, color = cut, shape = color)) + geom_point()
+
+
+```
+
+#Las etiquetas (labs)
+
+Las etiquetas ayudan a visualizar lo que queremos representar en un gráfico. Las más comunes son el título principal del gráfico, los títulos de los ejes y las leyendas. Para ello utilizamos la capa labels, destinada a especificar las etiquetas. Sin embargo, la manipulación del tamaño, el color de las etiquetas es trabajo del theme que veremos más adelante.
+
+
+```{r  }
+
+gg <- ggplot(diamonds, aes(x=carat, y=price, color=cut))+
+  geom_point()+
+  labs(title="Diagrama de puntos", x="Tamano", y="Precio")
+
+```
+
+# El aspecto (facet)
+
+En el gráfico anterior, veíamos un diagrama de dispersión para todos los diferentes valores de corte trazado en el mismo gráfico. Si lo que preferimos es ver un gráfico separado por grupos (e.g. para cada uno de los tipos de cut) debemos utilizar la opción facet_wap(fórmula).
+facet_wrap(fórmula) toma una fórmula como argumento. Los elementos que coloquemos a la derecha corresponden a las columnas, y los que coloquemos a la izquierda definen las filas.
+
+Por ejemplo, si definimos las columnas por ‘cut’.
+
+```{r  }
+
+gg +
+  facet_wrap(~cut, ncol = 3)
+
+```
+
+
+```{r  }
+
+gg +
+  facet_wrap(~color, ncol = 3)
+
+```
+
+Si definimos las filas por “color” y columnas “cut”.
+```{r  }
+
+gg +
+  facet_wrap(color~cut)
+
+
+```
+
+
+# Tipos de gráficos
+
+## Diagrama de dispersión
+
+El diagrama de dispersión (o nube de puntos) representa pares de valores como las coordenadas de un punto.
+Sobre la nube de puntos puede trazarse una recta, o cualquier tipo de función, que se ajuste a ellos lo mejor
+posible. Es la representación gráfica más útil para describir el comportamiento conjunto de dos variables
+numéricas.
+Continuamos con los datos diamonds. Pero ahora vamos a cambiar el tamaño y el color de los puntos en función de cut.
+
+```{r  }
+
+ggplot(diamonds, aes(x=carat, y=price, color = cut, size = cut)) + geom_point()
+```
+
+## Curvas de ajuste
+
+Si queremos incluir curvas de ajuste que muestren la tendencia general de los datos podemos utilizar la función geom_smooth.
+Agregar una curva de suavizado con región de confianza al 95% (opción por defecto).
+El área gris alrededor de la curva es un intervalo de confianza que indica cuánta incertidumbre (error) hay en esta curva de suavizado.
+
+```{r  }
+
+#Usamos geom_smooth
+gg + geom_smooth()
+```
+
+## Histograma
+
+El histograma nos permite representar las distribuciones de frecuencias mediante barras, donde la superficie de cada barra es proporcional a la frecuencia de los valores representados. Así podemos obtener una idea de la distribución de la muestra, respecto a una característica, cuantitativa y continua (como la longitud o el
+peso).
+Realizamos un histograma del precio en el que indicamos que el relleno de las barras debe ser de color blanco y los bordes negros.
+
+```{r  }
+
+ggplot(diamonds) + geom_histogram(aes(x = price), fill= 'black')
+
+```
+## Diagramas de cajas
+
+Un diagrama de caja es un diagrama que muestra la distribución estadística de un conjunto de datos. Los valores correspondientes al límite superior de la caja indican el percentil 75, el límite inferior corresponde al percentil 25 y la linea horizontoal a la mediana o percentil 50. Es decir, la caja representa el 50% de los valores centrales. Las lineas verticales indican el valor máximo y mínimo obervado. Los valores que queden más allá de estas líneas son considerados valores atípicos (outliers).
+
+```{r  }
+
+ggplot(diamonds, aes(x = price)) + geom_boxplot()
+
+```
+
+## Gráficos de barras
+
+Los gráficos de barras son apropiados para representar las frecuencias absolutas de los valores de factores.
+
+Vamos a mostrar el número de diamantes que tenemos en el dataset clasificados por su color. 
+
+```{r  }
+
+ggplot(diamonds, aes(x = color)) + geom_bar()
+ 
+```
+
+Ahora mostraremos un gráfico de barras en el que podemos ver el número de diamantes de cada color, y para color se diferenciarán los diamantes en función de su corte.
+
+```{r  }
+
+ggplot(diamonds, aes(x = color, color = cut)) + geom_bar()
+ 
+```
+# Cambiar temas (Theme)
+Aparte del tema básico de ggplot2, puedes cambiar la apariencia del fondo de las gráficas usando uno de estos temas incorporados.
+* theme_gray()
+* theme_bw()
+* theme_linedraw()
+* theme_light()
+* theme_minimal()
+* theme_classic()
+* theme_void()
+
+
+A continuación vamos a usar el último gráfico que hemos generado y vamos a ir cambiando el tema para ver el efecto que tiene en la figura. 
+
+```{r  }
+
+ggplot(diamonds, aes(x = color, color = cut)) + geom_bar() + theme_linedraw()
+  
+```
+
+
+```{r }
+ggplot(diamonds, aes(x = color, color = cut)) + geom_bar() + theme_void()
+  
+```
+

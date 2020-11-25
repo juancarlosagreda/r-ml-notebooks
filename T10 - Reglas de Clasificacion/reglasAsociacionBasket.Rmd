@@ -1,0 +1,326 @@
+---
+title: "Ejemplo reglas de asociación"
+output: html_notebook
+Source: https://rpubs.com/Joaquin_AR/397172
+---
+
+En este ejercicio se dispone del registro de todas las compras que se han realizado en un supermercado. El objetivo del análisis es identificar productos que tiendan a comprarse de forma conjunta para así poder situarlos en posiciones cercanas dentro de la tienda y maximizar la probabilidad de que los clientes compren. 
+
+Para este ejemplo se emplea el set de datos Groceries del paquete arules, que contiene un registro de las ventas realizadas por un supermercado durante 30 días. En total se dispone de 9835 transacciones formadas por combinaciones de 169 productos. La variable Groceries almacena la información en un formato propio de este paquete (descrito más adelante). Para representar mejor lo que suele ocurrir en la práctica, se ha reestructurado la información en formato de tabla. 
+
+Primero instalaremos el paquete arules donde se encuentra el algoritmo apriori y el dataset que vamos a utilizar. 
+
+```{r}
+install.packages("tidyverse")
+install.packages("arules")
+
+```
+Cargamos las librerías. 
+
+```{r}
+
+
+library(arules)
+library(ggplot2)
+
+
+```
+
+# Lectura del fichero
+
+
+Con la función read.transactions() se pueden leer directamente los datos de archivos tipo texto y almacenarlos en un objeto de tipo transactions, que es la estructura de almacenamiento que emplea  arules. Esta función tiene los siguientes argumentos:
+
+* file: nombre del archivo que se quiere leer.
+
+* format: estructura en la que se encuentran almacenados los datos, “basket” si cada línea del archivo es una transacción completa, o “single” si cada línea representa un item.
+
+* sep: tipo de separación de los campos.
+
+* header: valor booleano que indica si el nombre de las variables se encuentra en la primera fila. 
+
+* cols: si el formato es de tipo “basket”, un entero que indica la columna que contiene el identificador de las transacciones. Para el formato “single”, es un vector con los nombres (o posiciones) de las dos columnas que identifican las transacciones y los items, respectivamente.
+
+* rm.duplicates: valor lógico indicando si se eliminan los items duplicados en una misma transacción. Por lo general, es conveniente eliminarlos, el interés suele estar en qué items ocurren de forma conjunta, no en qué cantidad.
+
+* quote: carácter que se utiliza como comillas.
+
+* skip: número de líneas que hay que saltar desde el comienzo del fichero. 
+
+
+Los objetos transactions, se almacenan internamente como un tipo de matriz binaria. Se trata de una matriz de valores 0/1, con una fila por cada transacción, en este caso cada compra, y una columna por cada posible item, en este caso productos. La posición de la matriz (i,j) tiene el valor 1 si la transacción i contiene el item j.
+
+```{r}
+
+groceries <- read.transactions(file = "datos_groceries.csv",
+                                   format = "single",
+                                   sep = ",",
+                                   header=TRUE,
+                                   cols = c("id_compra", "item"),
+                                   rm.duplicates = TRUE)
+
+summary(groceries)
+
+
+```
+
+
+Cada línea del archivo contiene la información de un item y el identificador de la transacción (compra) a la que pertenece. Esta es la estructura en la que comúnmente se almacenan los datos dentro de una base de datos y que, en el ámbito de las transacciones, recibe el nombre de tabla larga o single. Otra forma en la que se pueden encontrar los datos de transacciones es en formato matriz o tabla ancha, en el que cada fila contiene todos los items que forman parte de una misma transacción, este formato recibe el nombre de cesta o basket.
+
+El concepto de transacción hace referencia al conjunto de items o eventos que ocurren de forma conjunta. Para este caso de estudio, compras de supermercado, cada transacción está formada por todos los productos que se compran a la vez, es decir, el vínculo de unión no es el cliente sino cada una de las “cestas de la compra”. Por ejemplo, la transacción con  id_compra == 14 está formada por 3 items.
+
+
+Visualizar las primeras 5 transacciones con la función inspect.
+```{r}
+inspect(groceries[1:5])
+
+```
+
+
+
+Para poder dibujar un histograma que visualice el tamaño de las transacciones, convertiremos el objeto tipo transacciones en un dataframe con la función as. De esta forma, podremos usar la función ggplot. 
+
+```{r}
+#Convertir a dataframe
+df_groceries=as(groceries, Class="data.frame")
+
+
+ggplot(df_groceries, aes(x=tamanyos))+
+  geom_histogram()+
+  xlab("Distribucion del tamaño de las transacciones")+
+  ylab("Tamaño")+
+  theme_bw()
+
+
+```
+
+
+El siguiente análisis básico consiste en identificar cuáles son los items más frecuentes (los que tienen mayor soporte) dentro del conjunto de todas las transacciones. Con la función *itemFrequency()* se puede extraer esta información de un objeto tipo transactions. El nombre de esta función puede causar confusión. Por “frecuencia” se hace referencia al soporte de cada item, que es la fracción de transacciones que contienen dicho item respecto al total de todas las transacciones. Esto es distinto a la frecuencia de un item respecto al total de items, de ahí que la suma de todos los soportes no sea 1.
+
+
+Examinar la frecuencia de los items con la función itemFrequency.
+
+```{r}
+itemFrequency(groceries[, 1:3])
+
+frecuenciaItems=itemFrequency(x=groceries, type="relative")
+#frecuenciaItems
+frecuenciaItems2=sort(frecuenciaItems, decreasing=TRUE)
+head(frecuenciaItems2)
+```
+Si se indica el argumento type = "absolute", la función itemFrequency() devuelve el número de transacciones en las que aparece cada item.
+
+```{r}
+frecuenciaItems=itemFrequency(x=groceries, type="absolute")
+#frecuenciaItems
+frecuenciaItems2=sort(frecuenciaItems, decreasing=TRUE)
+head(frecuenciaItems2)
+
+# plot the frequency of items
+itemFrequencyPlot(groceries, support = 0.1)
+
+itemFrequencyPlot(groceries, topN = 20)
+```
+
+El listado anterior muestra que los 5 productos que más se venden son: whole milk, other vegetables, rolls/buns y soda.
+
+Es muy importante estudiar cómo se distribuye el soporte de los items individuales en un conjunto de transacciones antes identificar itemsets frecuentes o crear reglas de asociación, ya que, dependiendo del caso, tendrá sentido emplear un límite de soporte u otro. Por lo general, cuando el número de posibles items es muy grande (varios miles) prácticamente todos los artículos son raros, por lo que los soportes son muy bajos. 
+
+#Algoritmo apriori
+
+Con la función apriori() se puede aplicar el algoritmo Apriori a un objeto de tipo transactions y extraer tanto itemsets frecuentes como reglas de asociación que superen un determinado soporte y confianza. Los argumentos de esta función son:
+
+* data: un objeto del tipo transactions o un objeto que pueda ser convertido a tipo transactions, por ejemplo un dataframe o una matriz binaria.
+
+* parameter: lista en la que se indican los parámetros del algoritmo.
+
+* support: soporte mínimo que debe tener un itemset para ser considerado frecuente. Por defecto es 0.1.
+
+* minlen: número mínimo de items que debe tener un itemset para ser incluido en los resultados. Por defecto 1.
+
+* maxlen: número máximo de items que puede tener un itemset para ser incluido en los resultados. Por defecto 10.
+
+* target: tipo de resultados que debe de generar el algoritmo, pueden ser “frequent itemsets”, “maximally frequent itemsets”, “closed frequent itemsets”, “rules” o “hyperedgesets”.
+
+* confidence: confianza mínima que debe de tener una regla para ser incluida en los resultados. Por defecto 0.8.
+
+* maxtime: tiempo máximo que puede estar el algoritmo buscando subsets. Por defecto 5 segundos.
+
+* appearance: lista que permite definir patrones para restringir el espacio de búsqueda, por ejemplo, especificando qué items pueden o no pueden aparecer.
+
+* control: lista que permite modificar aspectos internos de algoritmo como la ordenación de los itemsets, si se construye un árbol con las transacciones, aspectos relacionados con el uso de memoria, etc.
+
+**IMPORTANTE ** Vamos a calcular los itemsets, incluidos, incluidos los formados por un único item, que hayan sido comprados al menos 30 veces.
+Para definir el soporte se usará este valor dividido entre el total de transacciones. 
+
+```{r}
+soporte <- 30 / dim(groceries)[1]
+print(soporte)
+a<-dim(groceries)[1]
+print(a)
+```
+
+Usamos la función a priori:
+```{r}
+
+itemsets <- apriori(data = groceries,
+                    parameter = list(support = soporte,
+                                     minlen = 1,
+                                     maxlen = 20,
+                                     target = "frequent itemset"))
+```
+```{r}
+summary(itemsets)
+```
+
+
+Se han encontrado un total de 2226 itemsets frecuentes que superan el soporte mínimo de 0.003908286, la mayoría de ellos (1140) formados por dos items. En el siguiente listado se muestran los 20 itemsets con mayor soporte que, como cabe esperar, son los formados por items individuales (los itemsets de menor tamaño).
+```{r}
+# Se muestran los top 20 itemsets de mayor a menor soporte
+top_20_itemsets <- sort(itemsets, by = "support", decreasing = TRUE)[1:20]
+inspect(top_20_itemsets)
+```
+
+La representación gráfica de estos resultados en forma de histograma. Al igual que en el caso anterior, para poder usar la función ggplot hay que convertir la variable top_20_itemsets a una variable de tipo dataframe con la función as().
+
+```{r}
+#Convertir a dataframe
+df_top20=as(top_20_itemsets, Class="data.frame")
+
+
+ggplot(df_top20, aes(x = reorder(items, support), y = support)) +
+  geom_col() +
+  coord_flip() +
+  labs(title = "Itemsets más frecuentes", x = "itemsets") +
+  theme_bw()
+
+```
+
+Si se quieren excluir del análisis los itemsets formados únicamente por un solo item, se puede aplicar de nuevo la función apriori() especificando minlen = 2.
+
+
+```{r}
+itemsets <- apriori(data = groceries,
+                    parameter = list(support = soporte,
+                                     minlen = 2,
+                                     maxlen = 20,
+                                     target = "frequent itemset"))
+```
+```{r}
+summary(itemsets)
+```
+
+Mostrar los 20 itemsets más frecuentes formados por más de un item con la función inspect().
+```{r}
+# Se muestran los 20 itemsets más frecuentes formados por más de un item.
+inspect(sort(itemsets[size(itemsets) > 1], decreasing = TRUE)[1:20])
+```
+
+# Filtrado de itemsets
+
+Una vez que los itemsets frecuentes han sido identificados mediante el algoritmo Apripori, pueden ser filtrados con la función subset(). Esta función recibe dos argumentos: un objeto itemset o rules y una condición lógica que tienen que cumplir las reglas/itemsets para ser seleccionados. La siguiente tabla muestra los operadores permitidos:
+
+
+| Operador        | Significado | 
+| ------------- |:-------------:| 
+| &             | AND           |
+| %in%          | contiene cualquier de los siguientes elementos      |  
+| %ain%         | contiene todos de los siguientes elementos     |  
+| %pin%         |contiene parcialmente los siguientes elementos    |  
+
+Como esta función tiene el mismo nombre que una función del paquete básico de R, para evitar errores, es conveniente especificar el paquete donde se encuentra.
+
+Se procede a identificar aquellos itemsets frecuentes que contienen el item newspapers y se muestran los 10 primeros.
+
+```{r}
+itemsets_filtrado <- arules::subset(itemsets,
+                                    subset = items %in% "newspapers")
+itemsets_filtrado
+
+# Se muestran 10 de ellos
+inspect(itemsets_filtrado[1:10])
+```
+
+¿Y si quisiesemos mostrar aquellos itemsets que contienen newspapers y whole milk?
+
+```{r}
+itemsets_filtrado <- arules::subset(itemsets,
+                                    subset = items %ain% c("newspapers", "whole milk"))
+itemsets_filtrado
+inspect(itemsets_filtrado[1:10])
+
+```
+
+# Reglas de asociación
+Para crear las reglas de asociación se sigue el mismo proceso que para obtener itemsets frecuentes pero, además de especificar un soporte mínimo, se tiene que establecer una confianza mínima para que una regla se incluya en los resultados. En este caso, se emplea una confianza mínima del 70%.
+
+
+
+
+```{r}
+soporte <- 30 / dim(groceries)[1]
+reglas <- apriori(data = groceries,
+                  parameter = list(support = soporte,
+                                   confidence = 0.70,
+                                   # Se especifica que se creen reglas
+                                   target = "rules"))
+```
+
+
+
+Con la función summary se puede ver que se han identificado un total de 19 reglas, la mayoría de ellas formadas por 4 items en el antecedente (parte izquierda de la regla).
+```{r}
+summary(reglas)
+```
+Para poder visualizar las reglas utilizaremos la función inspect().
+
+La segunda regla se puede interpretar como: si un cliente compra mantequilla, vegetales y yogurt también comprará leche con un support de 0,003 y una confianza del 79%,por lo tanto esta transaccion será correcta en el 79% de compras que involucren mantequilla, vegetales y yogurt. 
+
+El indicador lift expresa cuál es la proporción del soporte observado de un conjunto de productos respecto del soporte teórico de ese conjunto dado el supuesto de independencia. 
+* Un valor de lift = 1 indica que ese conjunto aparece una cantidad de veces acorde a lo esperado bajo condiciones de independencia. 
+* Un valor de lift > 1 indica que ese conjunto aparece una cantidad de veces superior a lo esperado bajo condiciones de independencia (por lo que se puede intuir que existe una relación que hace que los productos se encuentren en el conjunto más veces de lo normal). 
+* Un valor de lift < 1 indica que ese conjunto aparece una cantidad de veces inferior a lo esperado bajo condiciones de independencia (por lo que se puede intuir que existe una relación que hace que los productos no estén formando parte del mismo conjunto más veces de lo normal) (Wikipedia).
+
+
+```{r}
+inspect(sort(x = reglas, decreasing = TRUE, by = "confidence"))
+```
+
+## Filtrado de reglas
+Cuando se crean reglas de asociación, pueden ser interesantes únicamente aquellas que contienen un determinado conjunto de items en el antecedente o en el consecuente. Con arules existen varias formas de seleccionar solo determinadas reglas. 
+
+Es posible restringir los items que aparecen en el lado izquierdo y/o derecho de la reglas a la hora de crearlas, por ejemplo, supóngase que solo son de interés reglas que muestren productos que se vendan junto con other vegetables. Esto significa que el item other vegetables, debe aparecer en el lado derecho (rhs).
+
+Esto mismo puede hacerse con el lado izquierdo (lhs) o en ambos (both). 
+
+
+```{r}
+soporte <- 30 / dim(groceries)[1]
+reglas_vegetables <- apriori(data = groceries,
+                             parameter = list(support = soporte,
+                                              confidence = 0.70,
+                                              # Se especifica que se creen reglas
+                                              target = "rules"),
+                             appearance = list(rhs = "other vegetables"))
+
+summary(reglas_vegetables)
+inspect(reglas_vegetables)
+```
+
+
+También es posible filtrar las reglas una vez que han sido creadas. Por ejemplo, se procede a filtrar aquellas reglas que contienen other vegetables y citrus fruit en el antecedente.
+
+```{r}
+filtrado_reglas <- subset(x = reglas,
+                          subset = lhs %ain% c("other vegetables","citrus fruit"))
+inspect(filtrado_reglas)
+```
+
+# Escribir las reglas en un fichero CSV
+
+
+```{r}
+write(reglas, file = "groceryrules.csv",
+      sep = ",", quote = TRUE, row.names = FALSE)
+```
+

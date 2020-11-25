@@ -1,0 +1,184 @@
+---
+title: "Segmentacion de clientes"
+output:
+html_document:
+df_print: paged
+html_notebook: default
+
+---
+
+
+La segmentación de clientes es la práctica de dividir un conjunto de clientes en grupos de individuos que son similares teniendo en cuenta criterios relevantes para el marketing, como la edad, el género, los intereses y los hábitos de gasto.
+
+Los beneficios de la segmentación de clientes incluyen:
+
+* Personalización: La personalización asegura se proporciona una experiencia excepcional al cliente.
+
+* Retención de clientes: Es 16 veces más costoso desarrollar una relación comercial a largo plazo con un nuevo cliente que simplemente cultivar la lealtad de un cliente existente.
+
+* Mejor retorno de la inversión para marketing asegurando que los mensajes se envían a las personas adecuadas.
+
+* Identificar nuevas oportunidades: La segmentación de clientes puede revelar nuevas tendencias acerca de los productos.
+
+
+El objetivo de este ejercicio consiste en identificar grupos de clientes para poder personalizar las campañas de marketing **aplicando el algoritmo KMeans**.
+
+Para ello usaremos un dataset que contiene las siguientes variables: 
+
+* CustomerID: ID del cliente
+* Genre: sexo
+* Age: edad
+* Annual Income (k$): Ingresos anuales
+* Spending Score (1-100): Puntuación de gasto - puntuación asignada al cliente por el centro comercial en base a sus habitos de compra
+
+
+Impotar las siguientes librerias:
+
+```{r}
+library(ggplot2) 
+library(dplyr)
+
+library(gridExtra)
+
+```
+
+Leer el fichero Mall_customers.csv.
+
+```{r}
+
+Mall_Customers <- read.csv("~/Desktop/University/Tercero Tecnun/Segundo semestre/Investigacion Operativa II/Machine Learning/R/T11 - Clustering/Mall_Customers2.csv")
+
+head(Mall_Customers)
+```
+
+# Análisis exploratorio de los datos 
+
+
+Vamos a mostrar mediante un gráfico de barras el número de clientes que son hombres y mujeres: 
+
+```{r}
+ ggplot(Mall_Customers, aes(x = Gender)) + geom_bar()
+```
+
+Desde una perspectiva empresarial, la mayoría de las empresas con éxito están centradas en un grupo objetivo en particular para brindarles la mejor experiencia. 
+
+Además, ocasionalmente, una empresa puede seleccionar más de un segmento como el foco de sus actividades, en cuyo caso, normalmente identificaría un objetivo principal y un objetivo secundario. 
+Los principales mercados objetivo son aquellos segmentos de mercado a los que se dirigen principalmente los esfuerzos de marketing y donde se asignan más recursos de la empresa, mientras que los mercados secundarios suelen ser segmentos más pequeños o menos vitales para el éxito de un producto.
+
+
+Vamos a analizar la edad de los clientes para ver en qué rango se encuentran ya que puede ser una variable importante a la hora de segmentar los clientes. 
+
+
+
+```{r}
+ggplot(Mall_Customers, aes(x = Age)) + geom_boxplot()
+mean(Mall_Customers$Age)
+#max(men$Age)
+mean(women$Age)
+#max(men$income)
+```
+
+
+
+Vamos a separar el dataset en hombres y mujeres, y mostraremos sus estadísticas más representativas.
+```{r}
+
+men <- filter(Mall_Customers, Gender == "Male")
+ggplot(men, aes(x = Age)) + geom_boxplot()
+
+women <- filter(Mall_Customers, Gender == "Female")
+ggplot(women, aes(x = Age)) + geom_boxplot()
+
+```
+
+
+
+
+
+Ahora analizaremos las variables de ingresos y las variables de puntuación de gasto, ya que vamos a mantener estas variables para realizar nuestro agrupamiento. 
+Realizar este análisis con la separación entre hombres y mujeres. 
+
+```{r}
+ggplot() + 
+  geom_point(aes(x = income, y = spendingScore), data = men, alpha = 0.5) + 
+  ggtitle('Hombres')
+
+ggplot() + 
+  geom_point(aes(x = income, y = spendingScore), data = women, alpha = 0.5) + 
+  ggtitle('Mujeres')
+
+```
+
+
+
+#Clustering
+
+K-means clustering es un algoritmo de aprendizaje automático no supervisado para agrupar observaciones *n* en grupos *k* donde *k* es una constante predefinida o definida por el usuario. La idea principal es definir *k* centroides, uno para cada grupo.
+
+El algoritmo K-Means implica:
+
+* Elegir el número de clusters *k*.
+* Asigna aleatoriamente cada punto a un grupo
+* Hasta que los clústeres dejen de cambiar, repetir para cada clúster calculando el centroide del clúster tomando el vector medio de puntos en el clúster.
+
+
+Nuestra hipótesis y la respuesta que intentamos dar utilizando k-means es que existe la intuición de que los clientes pueden agruparse de acuerdo con su puntuación de gasto dado su ingreso.
+
+Para ello vamos a guardar las variables que nos interesan (ingresos anuales y puntuacion de gasto) en otro dataset. 
+Para crear los clusters se usará todo el dataset, sin separar entre hombres y mujeres. 
+
+```{r}
+mallData <- Mall_Customers[,c("income","spendingScore")]
+```
+
+Para implementar el modelo de K-Means, empezamos por determinar la cantidad óptima de centroides a utilizar a partir del Elbow Method. Para ello, aplicaremos la función kmeans al conjunto de datos, variando en cada caso el valor de k, y acumulando los valores de Within-Cluster-Sum-of-Squares (WCSS) obtenidos:
+
+```{r}
+set.seed(123)
+wcss <- vector()
+for(i in 1:20){
+  wcss[i] <- sum(kmeans(mallData, i)$withinss)
+}
+```
+
+Una vez calculados los valores de WCSS en función de la cantidad de centroides k, vamos a graficar los resultados:
+
+```{r}
+
+ggplot() + geom_point(aes(x = 1:20, y = wcss), color = 'blue') + 
+  geom_line(aes(x = 1:20, y = wcss), color = 'blue') + 
+  ggtitle("Elbow method") + 
+  xlab('Cantidad de Centroides k') + 
+  ylab('WCSS')
+
+```
+
+Podemos ver que a partir de k=6 ya no hay tanta diferencia
+
+```{r}
+set.seed(1234)
+KMeansModel <- kmeans(mallData, 6, iter.max = 1000)
+KMeansModel
+```
+
+ 
+
+Visualizamos el resultado del clustering:
+
+
+```{r}
+
+mallData$cluster <- KMeansModel$cluster
+ggplot() + geom_point(aes(x = income, y = spendingScore, color = cluster), data = mallData, size = 2) +
+  scale_colour_gradientn(colours=rainbow(4)) +
+  geom_point(aes(x = KMeansModel$centers[, 1], y = KMeansModel$centers[, 2]), color = 'black', size = 3) + 
+  ggtitle('Clusters de Datos con k = 6 / K-Means') + 
+  xlab('Income') + ylab('Spending Score')
+
+#count(filter(mallData, cluster == 6))
+
+```
+
+# Resultados
+
+Hemos obtenido 6 clusters, y lo hemos decidido en base a los resultados del elbow method. Los puntos negros son los centroides de cada grupo que hemos obtenido, y los grupos los podemos visualizar por su color. Podemos ver una serie de diferencias, porque hay cuatro grupos significativamente definidos, que son los que ganan mucho y gastan poco (morado), los que ganan mucho y gastan mucho (verdes), los que ganan poco y gastan poco (amarillo), y los que ganan poco y gastan mucho (rojo). Tambien podemos ver que la mayor cantidad de concentracion esta en el centro, que son los que ganan mas o menos, y gastan mas o menos.

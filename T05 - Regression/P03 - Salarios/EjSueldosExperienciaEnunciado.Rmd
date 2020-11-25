@@ -1,0 +1,26 @@
+---
+title: 'Estimacion del sueldo en base a la experiencia '
+output:
+  html_document:
+    df_print: paged
+---
+
+El objetivo de este ejercicio es realizar un modelo que permite predecir el sueldo en base a los anios de experiencia. 
+Para ello se proporciona el fichero *salary_data.csv*. 
+
+Se pide analizar la relación entre las variables y crear un modelo en base a los datos. 
+
+Se tendrá que justificar la bondad del modelo y realizar una predicción usando dicho modelo para predecir el sueldo con una experiencia de 3 anios y de 7 anios. 
+
+Será importante ir explicando los pasos que se están realizando y LAS CONCLUSIONES QUE SE EXTRAEN en el proceso. 
+Habrá que contestar a las siguientes preguntas como mínimo:
+1. Hipotesis de partida
+2. Ecuación del modelo
+3. Analisis de la bondad del modelo creado
+4. Analisis de las predicciones
+5. Conclusiones
+
+```{r}
+
+```
+

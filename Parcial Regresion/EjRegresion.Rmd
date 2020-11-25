@@ -1,0 +1,113 @@
+---
+title: "Ejercicio"
+output: html_notebook
+---
+
+Existen numeros estudios que documentan que la temperatura global media ha aumentado durante el último siglo. Las consecuencias de un aumento continuo de la temperatura global incrementarán el nivel del mar y aumentarán la frecuencia de fenómenos meteorológicos.
+
+Queremos analizar cómo los cambios en algunas variables afectan las temperaturas en el futuro (Temp) y cómo estas variables explican los cambios de temperatura hasta el momento.
+
+Estudiaremos la relación entre la temperatura global media y otros factores. Los datos climáticos son de mayo de 1983 a diciembre de 2008. Las variables disponibles incluyen:
+
+* Año: el año de observación.
+* Mes: el mes de observación.
+* CO2, N2O, CH4, CFC.11, CFC.12: concentraciones atmosféricas de dióxido de carbono (CO2), óxido nitroso (N2O), metano (CH4), triclorofluorometano (CCl3F; comúnmente conocido como CFC-11) y diclorodifluorometano (CCl2F2) ; comúnmente referido como CFC-12), respectivamente. Estos datos provienen de la División de Monitoreo Global de ESRL / NOAA.
+* El CO2, N2O y CH4 se expresan en ppmv (partes por millón por volumen, es decir, 397 ppmv de CO2 significa que el CO2 constituye 397 millonésimas partes del volumen total de la atmósfera)
+* CFC.11 y CFC.12 se expresan en ppbv (partes por billón por volumen).
+* Aerosoles: la profundidad óptica del aerosol estratosférico medio a 550 nm. Esta variable está vinculada a los volcanes, ya que las erupciones volcánicas provocan la adición de nuevas partículas a la atmósfera, que afectan la cantidad de energía del sol que se refleja de nuevo en el espacio. Esta información proviene del Instituto Godard de Estudios Espaciales de la NASA.
+* TSI: la radiación solar total (TSI) en W / m2 (la velocidad a la que se deposita la energía solar por unidad de área). Debido a las manchas solares y otros fenómenos solares, la cantidad de energía que emite el sol varía sustancialmente con el tiempo. 
+* MEI: una medida de la fuerza de la oscilación del sur de El Niño / La Niña (un efecto del clima en el Océano Pacífico que afecta las temperaturas globales). 
+* Temp: la diferencia en grados Celsius entre la temperatura global promedio en ese período y un valor de referencia. 
+
+
+```{r}
+library(MASS)
+library(ISLR)
+library(psych)
+library(caret)
+library(caret)
+library (ggplot2)
+library(DMwR)
+library(stats)
+library(corrplot)
+library(plyr)
+library(magrittr)
+```
+
+Importamos los datos
+```{r}
+datos <- read.csv("~/Desktop/Tercero Tecnun/Segundo semestre/Investigacion Operativa II/Machine Learning/Parcial Regresion/datos.csv")
+
+summary(datos)
+head(datos)
+
+```
+
+¿Qué se puede deducir de la relación de la temperatura (Temp) con las variables CO2, y N2O ?
+Muestra gráficamente esta relación.
+
+
+
+
+```{r}
+#Primero temp con CO2
+ggplot(datos, aes(x=Temp, y = CO2)) + geom_point()
+#Ahora Temp con N20
+ggplot(datos, aes(x=Temp, y = N2O)) + geom_point()
+#Revisamos que no hayan valores nulos
+sum(is.na(datos))
+#Podemos ver que si tienen correlacion (que son proporcionales)
+```
+
+
+
+# Dividir el dataset para entrenar el modelo y testearlo
+En este caso vamos a usar esta division. no te tienes que preocupar de hacerla, la he hecho por ti. Para entrenar hay que usar climate_train y para testear climate_test.
+
+```{r}
+
+climate_train=subset(datos, Year<=2002)
+climate_test=subset(datos, Year>2002)
+
+dim(climate_train)
+dim(climate_test)
+```
+
+# Modelos de machine learning
+
+```{r}
+regmult <- lm(formula = Temp ~ CO2 + N2O, data = climate_train)
+summary(regmult)
+
+#Ahora vemos los residuos
+par(mfrow= c(2,2))
+plot(regmult)
+```
+Podemos ver que el p valor es adecuado, aunque el encaje con la R y R^2 no sean ideales. However, los residuos son normales como podemos ver.
+# Predicción
+
+```{r}
+predicador <- predict(object = regmult, newdata = climate_test, level = 0.95)
+print(predicador)
+
+#Errores de test
+compMyTest <- data.frame(cbind(actuals = climate_test$Temp, predicted = prediccion))
+tError <- regr.eval(compMyTest$actuals, compMyTest$predicted)
+tError
+
+
+#Ahora los errores de train
+predicador2 <- predict(object = regmult, newdata = climate_train, level = 0.95)
+compMyTrain <- data.frame(cbind(actuals = climate_train$Temp, predicted = predicador2))
+tstError <- regr.eval(compMyTrain$actuals, compMyTrain$predicted)
+tstError
+
+
+
+```
+
+# Conclusiones
+
+Ya que resolvi, podemos ver que los errores de train son mucho menores que los errores de test. Por lo tanto estamos overfitting.
+
+La correlacion entre las variables tampoco me convencen.

@@ -1,0 +1,334 @@
+---
+title: "Ejercicio de regresion lineal multiple"
+output:
+  html_document:
+    df_print: paged
+  html_notebook: default
+  pdf_document: default
+---
+
+
+# Introduccion
+
+
+En este ejemplo trabajaremos con el dataset Boston del paquete MASS. 
+El objetivo del problema es predecir el valor de la vivienda en funcion de las variables del fichero.
+
+**Objetivo:** El objetivo del problema es predecir el valor de la vivienda en funcion de las variables del fichero. 
+
+Este dataset Boston recoge la media del valor de la vivienda en 506 areas residenciales de Boston. Junto con el precio, se han registrado 13 variables adicionales.
+
+* crim: ratio de criminalidad per capita de cada ciudad.
+* zn: Proporcion de zonas residenciales con edificaciones de mas de 25.000 pies cuadrados.
+* indus: proporcion de zona industrializada.
+* chas: Si hay rio en la ciudad (= 1 si hay rio; 0 no hay).
+* nox: Concentracion de oxidos de nitrogeno (partes per 10 millon).
+* rm: promedio de habitaciones por vivienda.
+* age: Proporcion de viviendas ocupadas por el propietario construidas antes de 1940.
+* dis: Media ponderada de la distancias a cinco centros de empleo de Boston.
+* rad: Indice de accesibilidad a las autopistas radiales.
+* tax: Tasa de impuesto a la propiedad en unidades de $10,000.
+* ptratio: ratio de alumnos/profesor por ciudad.
+* black: 1000(Bk - 0.63)^2 donde Bk es la proporcion de gente de color por ciudad.
+* lstat: porcentaje de poblacion en condicion de pobreza.
+* medv: Valor medio de las casas ocupadas por el dueno en unidades de $1000s.
+
+
+Primero comenzaremos por cargar los paquetes necesarios.
+
+```{r}
+library(MASS)
+library(ISLR)
+library(psych)
+library(caret)
+library (ggplot2)
+library(DMwR)  # para usar la funcion regr.eval
+library(stats)
+```
+
+
+A continuacion, cargamos el dataset y visualizamos sus primeros elementos. tambien identificamos el numero de filas y columnas. 
+
+```{r}
+# Carga el dataset
+data("Boston")
+
+# Muestra las primeras filas del dataset
+head (Boston)
+# numero de filas y columnas
+nrow(Boston)
+ncol(Boston)
+
+```
+
+# Analisis exploratorio
+
+En primer lugar se realiza un analisis basico de los datos de forma numerica y grafica.
+Usaremos la funcion **summary** que cuando se aplica a una variable presenta un pequeno resumen descriptivo. Si la variable es numerica, dicho resumen incluye el manimo, maximo, mediana, primer y tercer cuartiles, media y numero de valores perdidos. Si la variable es de tipo factor, **summary()** muestra el numero de observaciones en cada nivel del factor: 
+
+```{r}
+
+summary(Boston)
+
+```
+
+Tambien comprobaremos que no existen valores ausentes (NA) con la funcion 
+**any(is.na(dataset))**. 
+
+```{r}
+any(is.na(Boston))
+
+# Podemos contar los elementos ausentes
+sum(is.na(Boston$medv))
+
+#Si los hay, podemos omitirlos de la siguiente manera: 
+dataBoston <- na.omit(Boston)
+```
+
+
+El primer paso a la hora de establecer un modelo lineal múltiple es estudiar la relación que existe entre variables. Esta información es crítica a la hora de identificar cuáles pueden ser los mejores predictores para el modelo, qué variables presentan relaciones de tipo no lineal (por lo que no pueden ser incluidas) y para identificar colinialidad entre predictores. A modo complementario, es recomendable representar la distribución de cada variable mediante histogramas.
+
+Usaremos la función *multi.hist*, dibujando en rojo la curva normal y en azul la función de densidad. 
+
+
+
+```{r}
+library(psych)
+multi.hist(x = Boston, dcol = c("blue", "red"), dlty = c("dotted", "solid"))
+
+```
+
+
+
+
+# Dividir el data set:entrenamiento y test 
+
+
+Ahora se divide  el conjunto de datos en dos subconjuntos:
+
+1. Conjunto de entrenamiento: Un subconjunto para entrenar un modelo (80% de los datos)
+
+2. Conjunto de prueba: Un subconjunto para probar el modelo entrenado (20% de los datos)
+
+```{r}
+set.seed(123)
+# create a list of 80% of the rows in the original dataset we can use for training
+validation_index <- createDataPartition(Boston$medv, p=0.80, list=FALSE)
+# select 20% of the data for validation
+testBoston <- Boston[-validation_index,]
+# use the remaining 80% of data to training and testing the models
+trainBoston <- Boston[validation_index,]
+
+```
+
+# Modelo de regresión multiple
+
+Se quiere generar un modelo que permita explicar el precio de la vivienda de una población empleando para ello cualquiera de las variables disponibles en el dataset Boston y que resulten útiles en el modelo.
+
+R permite crear un modelo con todas las variables incluidas en un data.frame de la siguiente forma:
+```{r}
+modeloRegMultiple <- lm(formula = medv ~ ., data = trainBoston)
+# Tambienn se pueden especificar una a una 
+summary(modeloRegMultiple)
+```
+
+El *p-value* obtenido para el estadístico F es muy pequeño (< 2.2e-16) lo que indica que al menos uno de los predictores introducidos en el modelo está relacionado con la variable respuesta *medv*. 
+El modelo es capaz de explicar el 72,5% de la variabilidad observada en el precio de la vivienda (*R^2*=0.7258).
+El R-cuadrado ajustado (Adjusted R-squared) es el parametro que se debe usar con modelos de más de una variable, ya que R-cuadrado  puede aumentar a medida que se agregan predictores al modelo de regresión. Sin embargo, este aumento es artificial cuando los predictores no mejoran el ajuste del modelo.
+
+En el summary se puede observar que algunos predictores tienen p-values muy altos, sugiriendo que no contribuyen al modelo por lo que deben ser excluidos, por ejemplo *age* e *indus*. 
+
+
+Revisamos los residuos para ver si el modelo sigue un modelo lineal. 
+Los residuos confirman que los datos no se distribuyen de forma lineal pero se han mejorado los resultados del modelo de regresión simple (plot1 y plot2). 
+
+
+```{r}
+par(mfrow = c(2,2))
+plot(modeloRegMultiple)
+```
+
+Ahora predecimos los valores de medv para los datos guardados en el data set de test. 
+
+```{r}
+
+
+prediccionRegMult<-predict(object=modeloRegMultiple, newdata=testBoston, level=0.95)
+
+print(prediccionRegMult)
+
+```
+
+
+
+En la variable que ha devuelto el metodo *predict* se guardan los valores que se han predicho utilizando el modelo de predicción creado. 
+Nos interesa compararlos con los valores que tenemos en el data set *testBoston* para ver la fiabilidad de nuestro modelo. 
+
+Vamos a calcular el training error rate y el test error rate. 
+
+* **Training error rate**: error que comete el modelo al predecir observaciones que pertenecen al training data set.
+* **Test error rate**: error que comete el modelo al predecir observaciones de un data set de test y que por lo tanto el modelo no ha "visto".
+
+
+Creamos un data frame con los valores predichos con el modelo y los valores que teníamos en el data set de test. 
+
+
+
+```{r}
+
+comparativa<-data.frame(cbind(actuals=testBoston$medv, predicted=prediccionRegMult))
+comparativa
+
+```
+
+Se calculan los errores que se están cometiendo al realizar las predicciones utilizando la función *regr.eval* que recibe como argumento de entrada los valores observados y los valores obtenidos con el modelo de predicción:
+
+```{r}
+# Error en el test
+testErrors<-regr.eval(comparativa$actuals, comparativa$predicted)
+testErrors
+
+```
+
+
+
+Tambien vamos a calcular el training error rate:
+```{r}
+#Error en las predicciones realizadas con el data set train
+prediccionRegMultTrain<-predict(object=modeloRegMultiple, newdata=trainBoston, level=0.95)
+
+comparativaTrain<-data.frame(cbind(actuals=trainBoston$medv, predicted=prediccionRegMultTrain))
+comparativaTrain
+
+trainErrors<-regr.eval(comparativaTrain$actuals, comparativaTrain$predicted)
+trainErrors
+
+```
+
+Al comparar los errores, vemos que el training error rate es inferior al test error rate, como era de esperar. También nos fijamos que las diferencias entre los dos errores no son muy elevadas. EStamos descartando un posible overfitting de nuestro modelo. 
+```{r}
+
+#Error en el train
+trainErrors<-regr.eval(comparativaTrain$actuals, comparativaTrain$predicted)
+trainErrors
+# Error en el test
+testErrors<-regr.eval(comparativa$actuals, comparativa$predicted)
+testErrors
+```
+
+
+## Correlación y multicolinealidad
+
+En los modelos de regresión lineal con múltiples predictores, además del estudio de los residuos vistos en el modelo simple, es necesario descartar colinealidad o multicolinealidad entre variables.
+
+En el modelo de regresión que incluye todas las variables del data set hemos detectado que hay algunos predictores que tienen p-values muy altos, sugiriendo que no contribuyen al modelo por lo que deben ser excluidos, por ejemplo *age* e *indus*. 
+
+Para identificar qué variables son representativas para el modelo vamos a analizar la correlación y multicolinealidad.
+
+Vamos a crear la matriz de correlacion que mide la fuerza y la direccion de las relaciones entre las variables. Los valores que puede tomar siempre se encuentran comprendidos entre +1 o -1.
+
+* Cuando r = -1, existe una relacion lineal perfecta negativa.
+* Si r  esta proximo a -1, existe una relacion lineal negativa muy fuerte.
+* Cuando r esta proximo a 0, significa que no hay una relacion lineal.
+* Si r esta proximo a +1, existe una relacion lineal positiva muy fuerte.
+* Cuando r = +1, existe una relacion lineal perfecta positiva.
+
+
+
+
+```{r}
+
+
+correlacion<-round(cor(Boston), 1)
+
+library(corrplot)
+corrplot(correlacion, method="number", type="lower")
+```
+
+
+**Observaciones:** 
+
+* Para aplicar el modelo de regresion lineal, seleccionaremos las variables que tengan un indice alto de correlacion con nuestra variable objetivo (medv). En este caso, se observa que *rm* (numero de habitaciones) tiene un correlacion positiva alta con medv (0.7) y *lstat* (porcentaje de poblacion en condicion de pobreza) tiene una correlacion negativa alta con medv (-0.7).
+
+* Un aspecto importante a la hora de elegir las variables para el modelo de regresion es analizar la multicolinealidad. La multicolinealidad en regresion es una condicion que ocurre cuando algunas variables predictoras incluidas en el modelo estan correlacionadas con otras variables predictoras. Las caracteristicas *rad* (indice de accesibilidad a las autopistas radiales), *tax* (Tasa de impuesto a la propiedad en unidades de $10,000) tiene una correlacion de 0.9, lo que implica que estan fuertemente correladas. 
+No deberiamos seleccionar estas dos caracteristicas juntas a la hora de entrenar el modelo. Lo mismo ocurre con *dis* (Media ponderada de la distancias a cinco centros de empleo de Boston) y *age* (Proporcion de viviendas ocupadas por el propietario construidas antes de 1940), que tienen una correlacion de -0.7.
+
+
+Por lo tanto, podríamos crear otro modelo eliminando las siguientes variables:
+
+*  *indus* y *age* porque en el análisis del modelo completo han obtenido una p>=0.05.
+*  *tax* porque hemos visto que tiene una correlación de 0.9 con *rad*. Elegimos una de las dos. 
+
+## Modelo 2
+El nuevo modelo entonces estará definido por el resto de variables: CRIM + CHAS + NOX + RM + DIS + PTRATIO + RAD + black + LSTAT
+
+
+```{r}
+
+modeloRegMultiple2 <- lm(formula = medv ~ crim+chas+nox+rm+dis+ptratio+rad+black+lstat, data = trainBoston)
+
+summary(modeloRegMultiple2)
+```
+
+Usamos el data set de test para predecir:
+```{r}
+prediccionRegMult2=predict(object=modeloRegMultiple2, newdata=testBoston, level=0.95)
+
+print(prediccionRegMult2)
+
+```
+
+Se calculan los errores cometidos en la predicción:
+```{r}
+comparativa2=data.frame(cbind(varlstat=testBoston$lstat, actuals=testBoston$medv, predicted=prediccionRegMult2))
+
+testErrorsMod2<-regr.eval(comparativa2$actuals, comparativa2$predicted)
+testErrorsMod2
+
+```
+Y los comparo con el modelo anterior: 
+
+```{r}
+testErrorsMod1<-regr.eval(comparativa$actuals, comparativa$predicted)
+testErrorsMod1
+```
+
+
+
+Tambien vamos a calcular el training error rate:
+```{r}
+#Error en las predicciones realizadas con el data set train
+prediccionRegMultTrain2<-predict(object=modeloRegMultiple2, newdata=trainBoston, level=0.95)
+
+comparativaTrainMod2<-data.frame(cbind(actuals=trainBoston$medv, predicted=prediccionRegMultTrain2))
+comparativaTrainMod2
+
+trainErrorsMod2<-regr.eval(comparativaTrainMod2$actuals, comparativaTrainMod2$predicted)
+trainErrorsMod2
+trainErrors  # train error modelo 1
+```
+
+Al comparar los errores, vemos que el training error rate es inferior al test error rate, como era de esperar. También nos fijamos que las diferencias entre los dos errores no son muy elevadas. EStamos descartando un posible overfitting de nuestro modelo. 
+```{r}
+
+#Error en el train y test
+trainErrorsMod2
+testErrorsMod2
+
+```
+
+
+
+# Conclusion
+
+Se han propuesto dos modelos de regresión múltiple, el primero con todas las variables del data set (modelo 1 contiene 13 variables) y el segundo modelo que tiene en cuenta 9 variables (modelo 2). 
+
+En relación con los modelos obtenidos y teniendo en cuenta el parámetro R^2, el modelo 1 tiene un R^2 de 0,7258 y el modelo 2 de 0,7192. Son muy parecidos. 
+en este caso, habría que valorar si merece la pena tener un modelo de 9 o 13 variables. 
+Cuantas más variables tengamos en nuestro modelo mayor será la complejidad del propio modelo como la de recopilar información sobre esas variables. 
+
+En cuento a las medidas de error, vemos que son muy similares. 
+En base a estos resultados, sería preferible quedarse con el modelo de 9 variables. 
+
+
+

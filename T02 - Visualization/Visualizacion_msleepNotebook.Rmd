@@ -1,0 +1,100 @@
+---
+title: 'Visualizacion: dataset msleep'
+output:
+  html_document:
+    df_print: paged
+---
+
+
+En este ejercicio trabajaremos con el dataset msleep. 
+Este dataset contiene información sobre el tiempo que duermen diferentes mamíferos. 
+Contine 83 filas y 11 variables. 
+
+
+* name
+* genus
+* vore: carnivore, omnivore or herbivore?
+* order conservation: the conservation status of the animal
+* sleep_total: total amount of sleep, in hours
+* sleep_rem: rem sleep, in hours
+* sleep_cycle:length of sleep cycle, in hours
+* awake: amount of time spent awake, in hours
+* brainwt: brain weight in kilograms
+* bodywt:body weight in kilograms
+
+
+Cargar la libreria para poder realizar las gráficas con ggplot2
+```{r}
+library(ggplot2)
+```
+
+Cargar el dataset y mostrar las primeras filas
+
+```{r}
+data(msleep)
+head(msleep)
+
+
+```
+
+
+
+Se pide generar los siguientes gráficos:
+
+1. Graficar el histograma del tiempo de sueño total, sleep_total 
+
+```{r }
+ggplot(msleep, aes(x = sleep_total)) + geom_histogram()
+```
+
+
+2. Graficar un boxplot utilizando la variable vore, de forma que se pueda ver el número de animales en función de su alimentación. 
+
+```{r }
+table(msleep$vore)
+ ggplot(msleep, aes(x = vore)) + geom_boxplot()
+                                
+```
+
+3. Mejorar la gráfica del apartado anterior, dibujando las barras por colores en función de la variable vore. 
+
+```{r }
+  ggplot(msleep, aes(y = vore, color = vore)) + geom_boxplot() 
+    
+```
+
+
+4. Graficar el sueño total en función del tiempo de sueño de la fase rem
+
+```{r }
+ggplot(msleep, aes(x = sleep_rem)) + geom_histogram()
+
+```
+
+5. Graficar el sueño total en función del tiempo de sueño de la fase rem, ahora dibujando los puntos en colores diferentes en función de la variable vore.
+
+
+
+```{r }
+ggplot(msleep, aes(x = sleep_rem, color = vore)) + geom_histogram()
+
+```
+
+
+6. Graficar el tiempo de sueño total en función de los ciclos de sueño (sleep_cycle)
+
+```{r }
+ggplot(msleep, aes(x = sleep_cycle)) + geom_histogram()
+
+```
+
+
+7. Graficar el peso del cerebro en función del tiempo de sueño,usando una escala logaritmica
+
+```{r }
+ggplot(msleep, aes(x = sleep_total, y = brainwt)) + geom_point() + scale_y_log10() 
+
+```
+
+
+

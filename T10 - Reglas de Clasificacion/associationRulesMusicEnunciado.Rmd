@@ -1,0 +1,113 @@
+---
+title: "Reglas de asociación: música"
+output: html_notebook
+---
+
+
+El conjunto de datos *lastfm.csv* es el resultado de realizar un seguimiento a las canciones que escuchan los usuarios en una radio online. ESte dataset tiene 289.955 observaciones con cuatro variables. 
+La información de este dataset se puede utilizar para recomendar música que le guste al usuario y además para enviar al usuario anuncios de música que probablemente comprará. 
+
+El propósito de este ejercicio es analizar el conjunto de datos llamado *lastfm.csv* e identificar las canciones que se deben recomendar en base a las escuchas realizadas. 
+
+Seguiremos los siguientes pasos: 
+
+Instalar las librerias necesarias. 
+```{r}
+if (!require("arules")) install.packages("arules", dependencies=TRUE)
+if (!require("dplyr")) install.packages("dplyr", dependencies=TRUE)
+
+
+```
+Cargar los paquetes.
+
+```{r}
+library(arules)
+library(dplyr)
+library(ggplot2)
+```
+
+Cargar el dataset
+Este dataset tiene la información del usuario  los grupos que escucha además del sexo del usuario y el país de procedencia. 
+Mostrar los primeros elementos del dataset. 
+
+```{r}
+lastfm <- read.csv("lastfm.csv", header = T, sep = ",") 
+sum(is.na(lastfm))
+lastfm <- na.omit(lastfm)
+```
+
+
+```{r}
+summary(lastfm)
+
+```
+
+
+
+
+¿Cuantos hombres y mujeres hay en el dataset?
+
+```{r}
+dim(filter(lastfm, sex == "f"))
+#78132 mujeres
+dim(filter(lastfm, sex == "m"))
+#211823 hombres
+```
+
+
+
+Seleccionar las dos primeras columnas del dataset (user y artist)
+```{r}
+lastfm2 <- lastfm[,1:2]
+```
+
+Borrar los elementos repetidos con función distinct
+
+```{r}
+lastfm2 <- distinct(lastfm2)
+dim(lastfm2)
+```
+
+
+Convertir el dataframe a una variable de tipo transaccion para poder aplicar el método a priori. 
+
+```{r}
+fmTransactions <- as(split(lastfm2$artist, lastfm2$user), "transactions")
+# Visualizar las 3 primeras filas
+inspect(fmTransactions[1:3])
+
+```
+Examinar la frecuencia de los items con la funcion itemFrequencyPlot.
+
+
+```{r}
+itemFrequencyPlot(lastfm, support = 0.1)
+
+```
+
+
+
+
+Usar la funcion a priori con los siguientes valores:
+* support=0.01
+* confidence=0.40
+* minlen=2
+
+```{r}
+
+myItemSet <- apriori(data = lastfm,
+                      parameter = list(support = 0.01,
+                                       minlen = 2,
+                                       confidence = 0.40))
+
+
+```
+
+
+Ordenar las reglas en función del nivel de confianza (con el parametro decreasing=TRUE)
+
+```{r}
+newSort <- sort(myItemSet, by = "confidence", decreasing = TRUE)
+inspect(newSort)
+```
+

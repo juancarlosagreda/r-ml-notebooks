@@ -1,0 +1,176 @@
+---
+title: "Clasificación de tumores"
+output: html_notebook
+html_document:
+df_print: paged
+
+---
+
+Los datos proceden de un estudio sobre diagnóstico del cáncer de mama por imagen. Mediante una punción con aguja fina se extrae una muestra del tejido sospechoso de la paciente. La muestra se tiñe para resaltar los núcleos de las células y se determinan los límites exactos de los núcleos. Las variables consideradas corresponden a distintos aspectos de la forma del núcleo. El fichero contiene un data frame, llamado  breast.cancer2, con 2 variables explicativas medidas en pacientes cuyos tumores fueron diagnosticados posteriormente como benignos o malignos y el factor y que toma los valores 0 o 1 en función de si las variables corresponden a un tumor benigno o maligno respectivamente. 
+
+En este ejemplo se testearán diferentes algoritmos de aprendizaje para determinar cuál de ellos obtiene mejores resultado en la predicción de los diagnósticos. 
+
+```{r}
+if (!require("caret")) { install.packages("caret"); library(caret) }
+
+if (!require("ggplot2")) { install.packages("ggplot2"); library(ggplot2) }
+if (!require("lattice")) { install.packages("lattice"); library(lattice) }
+
+```
+
+
+
+```{r}
+load('breastCancer.RData')
+dataCancer=breast.cancer2
+head(dataCancer)
+summary(dataCancer)
+
+
+```
+
+Realizaremos una representación gráfica de los datos, dibujando en dos colores diferentes aquellos casos en los que el diagnóstico ha sido benigno o maligno.  
+
+```{r}
+
+summary(dataCancer)
+ggplot(dataCancer, aes(x=dataCancer$x.smoothness, y=dataCancer$x.concavepoints, color=y))+
+  geom_point()
+
+```
+
+
+
+Si queremos ver cómo está distribuido el dataset en cuanto a tipos de cancer
+
+```{r}
+#Es binario 
+ggplot(dataCancer, aes(x = y, color = y)) + geom_bar(stat = "count", aes(fill = y))
+```
+
+
+# Dividir los datos en muestras para entrenamiento y test
+
+Para dividir los datos en una muestra de entrenamiento y otra de test se usa el comando createDataPartition. En el código siguiente p representa la proporción de datos en la muestra de entrenamiento. La partición se lleva a cabo para cada nivel de la variable y que aparece como primer argumento. El resultado es un vector con los índices de las filas seleccionadas para formar parte de la muestra de entrenamiento. 
+
+Un aspecto importante, sobre todo pensando en la reproducibilidad de nuestro trabajo, es que si iniciamos al generador de números aleatorios con un valor determinado, la secuencia de números pseudo-aleatorios se va a repetir y por lo tanto podemos reproducir exactamente una simulación estocástica.R utiliza la función set.seed(numero entero) para inicializar el generador de números aleatorios.
+
+```{r}
+set.seed(100)  # Para reproducir los mismos resultados
+IndicesEntrenamiento <- createDataPartition(y = dataCancer$y,
+                                            p = 0.75,
+                                            list = FALSE)
+Entrenamiento <- dataCancer[IndicesEntrenamiento,]
+Test <- dataCancer[-IndicesEntrenamiento,]
+```
+
+
+Es importante verificar que la distribución de la variable respuesta es similar en el conjunto de entrenamiento y en el de test. Por defecto, la función createDataPartition() garantiza una distribución aproximada.
+```{r}
+# Porcentajes en el dataset original de cada una de las clases
+prop.table(table(dataCancer$y))
+#Numero de elementos de cada clase en el dataset de entrenamiento
+table(Entrenamiento$y)
+prop.table(table(Entrenamiento$y))
+#Numero de elementos de cada clase en el dataset de test
+table(Test$y)
+prop.table(table(Test$y))
+
+```
+En efecto, vemos que para ambos conjuntos, la relación benigo/maligno se mantiene.
+
+# El comando train
+
+Se puede usar este comando único para aplicar un gran número de métodos de clasificación determinando (en caso necesario) los valores óptimos de sus parámetros mediante validación cruzada u otros métodos de remuestreo. Para usar  train en general es necesario:
+
+* Elegir el método de clasificación que queremos usar. El catálogo de todos los métodos disponibles se puede consultar en este enlace. Una información técnica detallada de cada método se puede obtener con el comando getModelInfo.
+
+* Si el método de clasificación requiere determinar parámetros, es necesario fijar cuáles y en qué rango de valores.
+
+* También hay que definir el método de remuestreo que se va a utilizar para determinar estos parámetros.
+
+
+# K vecinos más próximos
+
+Vamos a entrenar el modelo con el método KNN.
+Al visualizar el modelo obtenido, se obtiene una tabla donde se muestran las diferentes k's utilizadas, de la cual se elegirá aquella cuya precisión sea mayor. 
+
+```{r}
+modeloKNN <- train(y ~ ., data = Entrenamiento, method = "knn")
+modeloKNN
+```
+
+```{r}
+# Predict
+predictKNN <- predict(modeloKNN, Test)
+# Genera una matriz de confusion
+confusionMatrix(predictKNN, Test$y)$table
+# Mostrar la precision
+confusionMatrix(predictKNN, Test$y)$overall
+
+
+```
+
+Revisar el siguiente link (https://rdrr.io/cran/caret/man/confusionMatrix.html) para ver cómo obtener los valores de la precisión de la tabla de confusión. 
+
+# Arboles
+```{r}
+modeloTrees <- train(y ~ ., data = Entrenamiento, method = "rpart")
+modeloTrees
+#rpart.plot(modeloTrees$finalModel, main="Classification Tree2")
+```
+
+
+```{r}
+# Predict
+predictTrees <- predict(modeloTrees, Test)
+# Genera una matriz de confusion
+confusionMatrix(predictTrees, Test$y)$table
+# Mostrar la precision
+confusionMatrix(predictTrees, Test$y)$overall
+```
+
+
+# Support Vector Machine (SVM)
+
+
+```{r}
+modelSVM <- train(y ~ ., data = Entrenamiento, method = "svmLinear")
+modelSVM
+```
+
+
+```{r}
+# Predict
+predictSVN <- predict(modelSVM, Test)
+# Genera una matriz de confusion
+confusionMatrix(predictSVN, Test$y)$table
+# Mostrar la precision
+confusionMatrix(predictSVN, Test$y)$overall
+
+```
+
+
+
+# Random Forest
+
+```{r}
+modeloRForest <- train(y ~ ., data = Entrenamiento, method = "cforest")
+modeloRForest
+
+```
+
+
+```{r}
+# Predict
+predictRF <- predict(modeloRForest, Test)
+# Genera una matriz de confusion
+confusionMatrix(predictRF, Test$y)$table
+# Mostrar la precision
+confusionMatrix(predictRF, Test$y)$overall
+```
+
+
+
+¿Qué modelo es más preciso? 
+Podemos ver que el metodo SVN tiene precision del 100% y accuracy del 89%, pero como el metodo KNN tiene presicion del 100% y accurary del 90%, eligiriamos el KNN.

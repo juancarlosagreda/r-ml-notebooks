@@ -1,0 +1,20 @@
+"rules","support","confidence","lift","count"
+"{baking powder,yogurt} => {whole milk}",0.0032536858159634,0.711111111111111,2.78303930671619,32
+"{butter,onions} => {whole milk}",0.00305033045246568,0.75,2.93523676880223,30
+"{domestic eggs,sugar} => {whole milk}",0.00355871886120996,0.714285714285714,2.79546358933546,35
+"{butter,coffee} => {whole milk}",0.00335536349771225,0.702127659574468,2.74788123036804,33
+"{butter,curd} => {whole milk}",0.00488052872394509,0.716417910447761,2.80380825676631,48
+"{curd,domestic eggs} => {whole milk}",0.00477885104219624,0.734375,2.87408600278552,47
+"{butter,pork} => {whole milk}",0.00386375190645653,0.703703703703704,2.75404931393789,38
+"{curd,tropical fruit,yogurt} => {whole milk}",0.00396542958820539,0.75,2.93523676880223,39
+"{brown bread,other vegetables,root vegetables} => {whole milk}",0.00315200813421454,0.775,3.03307799442897,31
+"{butter,tropical fruit,yogurt} => {whole milk}",0.00335536349771225,0.733333333333333,2.87000928505107,33
+"{butter,root vegetables,yogurt} => {whole milk}",0.00305033045246568,0.789473684210526,3.08972291452866,30
+"{domestic eggs,other vegetables,whipped/sour cream} => {whole milk}",0.00355871886120996,0.7,2.73955431754875,35
+"{root vegetables,tropical fruit,whipped/sour cream} => {other vegetables}",0.00335536349771225,0.733333333333333,3.78998073217726,33
+"{tropical fruit,whipped/sour cream,yogurt} => {whole milk}",0.00437214031520081,0.704918032786885,2.7588017717704,43
+"{citrus fruit,root vegetables,tropical fruit} => {other vegetables}",0.00447381799694967,0.785714285714286,4.0606936416185,44
+"{root vegetables,tropical fruit,yogurt} => {whole milk}",0.00569395017793594,0.7,2.73955431754875,56
+"{citrus fruit,other vegetables,root vegetables,tropical fruit} => {whole milk}",0.00315200813421454,0.704545454545455,2.75734363129906,31
+"{citrus fruit,root vegetables,tropical fruit,whole milk} => {other vegetables}",0.00315200813421454,0.885714285714286,4.57750919600631,31
+"{other vegetables,root vegetables,tropical fruit,yogurt} => {whole milk}",0.00355871886120996,0.714285714285714,2.79546358933546,35

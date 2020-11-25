@@ -1,0 +1,380 @@
+---
+title: "Ejercicio de regresion lineal simple"
+output:
+  html_document:
+    df_print: paged
+  html_notebook: default
+  pdf_document: default
+---
+
+
+# Introduccion
+
+
+En este ejemplo trabajaremos con el dataset Boston del paquete MASS. 
+El objetivo del problema es predecir el valor de la vivienda en funcion de las variables del fichero.
+
+**Objetivo:** En este ejercicio vamos a comenzar con un modelo de regresion simple por lo que analizaremos la relacion entre la variable *lstat* con *medv*. 
+
+Este dataset Boston recoge la media del valor de la vivienda en 506 areas residenciales de Boston. Junto con el precio, se han registrado 13 variables adicionales.
+
+* crim: ratio de criminalidad per capita de cada ciudad.
+* zn: Proporcion de zonas residenciales con edificaciones de mas de 25.000 pies cuadrados.
+* indus: proporcion de zona industrializada.
+* chas: Si hay rio en la ciudad (= 1 si hay rio; 0 no hay).
+* nox: Concentracion de oxidos de nitrogeno (partes per 10 millon).
+* rm: promedio de habitaciones por vivienda.
+* age: Proporcion de viviendas ocupadas por el propietario construidas antes de 1940.
+* dis: Media ponderada de la distancias a cinco centros de empleo de Boston.
+* rad: Indice de accesibilidad a las autopistas radiales.
+* tax: Tasa de impuesto a la propiedad en unidades de $10,000.
+* ptratio: ratio de alumnos/profesor por ciudad.
+* black: 1000(Bk - 0.63)^2 donde Bk es la proporcion de gente de color por ciudad.
+* lstat: porcentaje de poblacion en condicion de pobreza.
+* medv: Valor medio de las casas ocupadas por el dueno en unidades de $1000s.
+
+
+Primero comenzaremos por cargar los paquetes necesarios.
+
+```{r}
+library(MASS)
+library(ISLR)
+library(psych)
+library(caret)
+library (ggplot2)
+library(DMwR)  # para usar la funcion regr.eval
+
+```
+
+
+A continuacion, cargamos el dataset y visualizamos sus primeros elementos. tambien identificamos el numero de filas y columnas. 
+
+```{r}
+# Carga el dataset
+data("Boston")
+# Muestra informacion del data set
+?Boston
+# Muestra las primeras filas del dataset
+head (Boston)
+# numero de filas y columnas
+nrow(Boston)
+ncol(Boston)
+
+
+```
+
+# Analisis exploratorio
+
+En primer lugar se realiza un analisis basico de los datos de forma numerica y grafica.
+Usaremos la funcion **summary** que cuando se aplica a una variable presenta un pequeno resumen descriptivo. Si la variable es numerica, dicho resumen incluye el manimo, maximo, mediana, primer y tercer cuartiles, media y numero de valores perdidos. Si la variable es de tipo factor, **summary()** muestra el numero de observaciones en cada nivel del factor: 
+
+```{r}
+
+summary(Boston)
+
+```
+
+Tambien comprobaremos que no existen valores ausentes (NA) con la funcion 
+**any(is.na(dataset))**. 
+
+```{r}
+any(is.na(Boston))
+
+# Podemos contar los elementos ausentes
+sum(is.na(Boston$medv))
+
+#Si los hay, podemos omitirlos de la siguiente manera: 
+dataBoston <- na.omit(Boston)
+```
+
+## Distribucion normal 
+
+
+Antes de generar el modelo, representaremos los datos para cuantificar la posible relación lineal entre variables y su magnitud. Si no detectáramos esta relación pasaríamos a plantearnos métodos de ajuste alternativos.
+Graficaremos para tratar de ver la relacion entre la variable resultado y las caracteristicas. 
+
+```{r}
+#Dibujar un historgrama. El argumento freq determina el tipo de histograma. 
+#freq = TRUE indica la frecuencia absoluta (conteo) en el eje y (es el valor por defecto).
+#freq = FALSE indica la densidad
+hist(Boston$medv, xlab=" Avg. casas ocupadas por el dueno en unidades de $1000s.", ylab="Frequency", col="steelblue")
+
+#DIBUJAR histograma con funcion de densidad. 
+
+hist(Boston$medv, xlab="Avg. casas ocupadas por el dueno en unidades de $1000s.", ylab="Density", col="steelblue", freq=FALSE)
+lines(density(Boston$medv),col="red", lty=2, lwd=3 )
+
+```
+
+
+Hacer la misma representación utilizando ggplot2:
+
+```{r}
+ggplot(Boston, aes(x=medv))+
+ geom_histogram(aes(y=..density..), fill="blue", colour="black")+
+	geom_density(colour="red")
+  
+```
+
+
+Vemos que los valores de *MEDV* estan distribuidos de forma normal con algunos outliers.  
+
+## Correlación y multicolinealidad
+
+Ahora, vamos a crear la matriz de correlacion que mide la fuerza y la direccion de las relaciones entre las variables. Los valores que puede tomar siempre se encuentran comprendidos entre +1 o -1.
+
+* Cuando r = -1, existe una relacion lineal perfecta negativa.
+* Si r  esta proximo a -1, existe una relacion lineal negativa muy fuerte.
+* Cuando r esta proximo a 0, significa que no hay una relacion lineal.
+* Si r esta proximo a +1, existe una relacion lineal positiva muy fuerte.
+* Cuando r = +1, existe una relacion lineal perfecta positiva.
+
+
+Esta matriz se calcula utilizando la funcion cor().
+Tambien podemos representar esta matriz de forma grafica con el comando corrplot, pero antes hay que cargar la libreria coorplot.
+
+
+```{r}
+cor(Boston)
+
+cor(Boston, Boston$medv)
+
+```
+
+Tambien podemos representar esta matriz de forma grafica con el comando corrplot, pero antes hay que cargar la libreria coorplot..
+
+```{r}
+
+
+correlacion<-round(cor(Boston), 1)
+
+library(corrplot)
+corrplot(correlacion, method="number", type="lower")
+```
+
+
+**Observaciones:** 
+
+* Para aplicar el modelo de regresion lineal, seleccionaremos las variables que tengan un indice alto de correlacion con nuestra variable objetivo (medv). En este caso, se observa que *rm* (numero de habitaciones) tiene un correlacion positiva alta con medv (0.7) y *lstat* (porcentaje de poblacion en condicion de pobreza) tiene una correlacion negativa alta con medv (-0.7).
+
+* Un aspecto importante a la hora de elegir las variables para el modelo de regresion es analizar la multicolinealidad. La multicolinealidad en regresion es una condicion que ocurre cuando algunas variables predictoras incluidas en el modelo estan correlacionadas con otras variables predictoras. Las caracteristicas *rad* (indice de accesibilidad a las autopistas radiales), *tax* (Tasa de impuesto a la propiedad en unidades de $10,000) tiene una correlacion de 0.9, lo que implica que estan fuertemente correladas. 
+No deberiamos seleccionar estas dos caracteristicas juntas a la hora de entrenar el modelo. Lo mismo ocurre con *dis* (Media ponderada de la distancias a cinco centros de empleo de Boston) y *age* (Proporcion de viviendas ocupadas por el propietario construidas antes de 1940), que tienen una correlacion de -0.7.
+
+
+
+
+
+# Dividir el data set:entrenamiento y test 
+
+
+Ahora se divide  el conjunto de datos en dos subconjuntos:
+
+1. Conjunto de entrenamiento: Un subconjunto para entrenar un modelo (80% de los datos)
+2, Conjunto de prueba: Un subconjunto para probar el modelo entrenado (20% de los datos)
+
+```{r}
+set.seed(123)
+# create a list of 80% of the rows in the original dataset we can use for training
+validation_index <- createDataPartition(Boston$medv, p=0.80, list=FALSE)
+# select 20% of the data for validation
+testBoston <- Boston[-validation_index,]
+# use the remaining 80% of data to training and testing the models
+trainBoston <- Boston[validation_index,]
+
+```
+
+
+
+
+# Modelo de regresión lineal simple
+
+Vamos a visualizar la relación entre las variables *lstat* y *medv* usando los diagramas de dispersion.
+
+```{r}
+
+
+ggplot(trainBoston, aes(x=lstat, y=medv))+
+  geom_point(colour="blue")+
+  labs(title="Relacion variables pobreza y precio")
+
+
+```
+
+
+
+¿Que se puede concluir viendo estas grafica? 
+
+ 
+ * Los precios tienen a bajar con un incremento de la variable *lstat*. 
+
+
+
+
+La función *lm* genera el modelo de regresion lineal con los datos de entrenamiento indicando los siguientes argumentos:
+
+* medv ~ lstat indica que se predice medv en funcion de solo la variable lstat
+* data=trainBoston: datos que se usan para crear el modelo. En este caso el data set de entrenamiento. 
+
+
+```{r}
+# Aplicar el modelo de regresion lineal
+
+#modeloRegSimple =train(medv ~ lstat, data=trainBoston, method="lm")
+modeloRegSimple =lm(medv ~ lstat, data=trainBoston)
+
+```
+
+Para visualizar los principales parámetros del modelo generado se utiliza **summary()**.
+Para ver toda la informacion que contiene el modelo usamos *name*.
+```{r}
+
+summary(modeloRegSimple)
+names(modeloRegSimple)
+modeloRegSimple$residuals
+```
+
+
+En la información devuelta por el summary se observa que el p-value del estadístico F es muy pequeño, indicando que al menos uno de los predictores del modelo está significativamente relacionado con la variable respuesta. Al tratarse de un modelo simple, el *p-value* de eestadístico *F* es el mismo que el *p-value* del estadístico *t* del único predictor incluido en el modelo *(lstat)*. La evaluación del modelo en conjunto puede hacerse a partir de los valores RSE o del valor *R^2* devuelto en el *summary*.
+
+* **Residual standar error (RSE)**: En promedio, cualquier predicción del modelo se aleja 6.216 unidades del verdadero valor. Teniendo en cuenta que el valor promedio de la variable respuesta medv es de 22.51, RSE es de (6.216/22.51)=26,77%.
+
+```{r}
+media=mean(trainBoston$medv)
+media
+RSE=(6.028/media)*100
+RSE
+```
+
+* *R^2*: El predictor *lstatus* empleado en el modelo es capaz de explicar el 54% de la variabilidad observada en el precio de las viviendas mediante la variable independiente *lstat*.
+
+La ventaja de **R^2* es que es independiente de la escala en la que se mida la variable respuesta, por lo que su interpretación es más sencilla.
+
+
+El *p-value* nos permite determinar si los estimadores de los parámetros son significativamente distintos de 0, es decir, que contribuyen al modelo. En este caso p-value: < 2.2e-16, por lo que en este caso lo son. 
+
+
+
+Los dos coeficientes de regresión estimados por el modelo son significativos y se pueden interpretar como:
+
+* Intercept beta0: El valor promedio del precio de la vivienda cuando el *lstat* es 0 es de 34.55384 unidades.
+* Predictor lstat(beta1): por cada unidad que se incrementa el predictor *lstat* el precio de la vivienda disminuye en promedio 0.95005 unidades.
+
+
+El modelo obtenido es: **precio medio vivienda=34.55384 -(0.95005 * lstat)** 
+
+
+ 
+La creación de un modelo de regresión lineal simple suele acompanarse de una representación grafica superponiendo las observaciones con el modelo. Ademas de ayudar a la interpretación y a detectar posibles anomalías.
+
+```{r}
+ggplot(trainBoston, aes(x=lstat, y=medv))+
+  geom_point() +
+  labs(title="Modelo de regresion simple")+
+  geom_smooth(method="lm")
+  
+
+```
+
+
+La representación gráfica de las observaciones muestra que la relación entre ambas variables estudiadas no es del todo lineal, lo que apunta a que otro tipo de modelo podría explicar mejor la relación. Aun así la aproximación no es mala.
+
+Una de las mejores formas de confirmar que las condiciones necesarias para un modelo de regresión lineal simple por mínimos cuadrados se cumplen es mediante el estudio de los residuos del modelo.
+
+En R, los residuos se almacenan dentro del modelo bajo el nombre de residuals. R genera automáticamente los gráficos más típicos para la evaluación de los residuos de un modelo.
+
+Los residuos confirman que los datos no se distribuyen de forma lineal, ni su varianza constante (plot1). Además se observa que la distribución de los residuos no es normal (plot2). Algunas observaciones tienen un residuo estandarizado absoluto mayor de 3 (1.73 si se considera la raíz cuadrada) lo que es indicativo de observación atípica (plot3). Valores de Leverages (hat) mayores que 2.5x((p+1)/n), siendo p el número de predictores y n el número de observaciones, o valores de Cook mayores de 1 se consideran influyentes (plot4). Todo ello reduce en gran medida la robustez de la estimación del error estándar de los coeficientes de correlación estimados y con ello la del modelo es su conjunto.
+
+```{r}
+par (mfrow=c(2,2))
+plot(modeloRegSimple)
+
+residuos<- rstandard(modeloRegSimple)
+qqnorm(residuos,col="blue")
+qqline(residuos,col="red")
+```
+
+
+
+
+Ahora usaremos los modelos para predecir la variable de salida y para ello usaremos el data set de test. 
+La función a utilizar es predict que tiene los siguientes argumentos: **predict(modeloPredictivo, data set de test, nivel de confianza)**
+
+```{r}
+library(stats)
+
+prediccionRegSimple<-predict(object=modeloRegSimple, newdata=testBoston, level=0.95)
+prediccionRegSimple
+summary(prediccionRegSimple)
+
+```
+
+En la variable que ha devuelto el metodo *predict* se guardan los valores que se han predicho utilizando el modelo de predicción creado. 
+Nos interesa compararlos con los valores que tenemos en el data set *testBoston* para ver la fiabilidad de nuestro modelo. 
+
+Vamos a calcular el training error rate y el test error rate. 
+
+* **Training error rate**: error que comete el modelo al predecir observaciones que pertenecen al training data set.
+* **Test error rate**: error que comete el modelo al predecir observaciones de un data set de test y que por lo tanto el modelo no ha "visto".
+
+
+Creamos un data frame con los valores predichos con el modelo y los valores que teníamos en el data set de test. 
+
+```{r}
+comparativa<-data.frame(cbind(actuals=testBoston$medv, predicted=prediccionRegSimple))
+comparativa
+
+```
+
+Se calculan los errores que se están cometiendo al realizar las predicciones utilizando la función *regr.eval* que recibe como argumento de entrada los valores observados y los valores obtenidos con el modelo de predicción:
+
+```{r}
+# Error en el test
+testErrors<-regr.eval(comparativa$actuals, comparativa$predicted)
+testErrors
+
+```
+
+Tambien vamos a calcular el training error rate:
+```{r}
+#Error en las predicciones realizadas con el data set train
+prediccionRegSimpleTrain<-predict(object=modeloRegSimple, newdata=trainBoston, level=0.95)
+
+comparativaTrain<-data.frame(cbind(actuals=trainBoston$medv, predicted=prediccionRegSimpleTrain))
+comparativaTrain
+
+trainErrors<-regr.eval(comparativaTrain$actuals, comparativaTrain$predicted)
+trainErrors
+
+```
+Al comparar los errores, vemos que el training error rate es inferior al test error rate, como era de esperar. También nos fijamos que las diferencias entre los dos errores no son muy elevadas. EStamos descartando un posible overfitting de nuestro modelo. 
+```{r}
+
+#Error en el train
+trainErrors<-regr.eval(comparativaTrain$actuals, comparativaTrain$predicted)
+trainErrors
+# Error en el test
+testErrors<-regr.eval(comparativa$actuals, comparativa$predicted)
+testErrors
+```
+
+
+Con esta gráfica mostramos los valores obtenidos con el modelo de regresión simple y los comparamos con los que ya teníamos en el data set de test. 
+
+
+```{r}
+ggplot(comparativa, aes(x=testBoston$lstat, y=actuals)) +
+  geom_point() +
+  geom_point(aes(y = predicted), shape = 1,color="red")+
+  geom_segment(aes(xend = testBoston$lstat, yend = predicted), alpha = .2) +
+  geom_smooth(method = "lm", se = FALSE, color = "lightgrey")  
+```
+
+
+
+# Conclusiones 
+
+El análisis del modelo de regresión simple utilizando R^2 ya nos dejaba intuir que el modelo no iba a ser muy fiable ya que su R^2 explica el 54% de la variable de respuesta. 
+El siguiente paso será realizar un modelo de regresión lineal multiple.
+
+
+

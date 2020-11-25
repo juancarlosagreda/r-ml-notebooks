@@ -1,0 +1,150 @@
+---
+title: 'Manejando dataframes y visualizacion'
+output:
+  html_document:
+    df_print: paged
+  pdf_document: default
+---
+
+# Visualizacion
+
+
+
+```{r}
+library("ggplot2")
+```
+
+
+
+
+Para los siguientes apartados de visualizacion usaremos los datos iris del paquete dataset en el que aparecen las medidas de ancho y largo de sépalo y pétalo de 3 especies diferentes de lirios.
+
+
+```{r}
+
+data(iris)
+?iris # con esto se ven en el help los atributos del data set
+
+```
+
+
+Histograma en función de la variable Sepal.Length
+
+```{r}
+
+ggplot(iris, aes(x = Sepal.Length)) + geom_histogram()
+
+```
+
+
+Histograma en función de la variable Sepal.Length en el que diferenciamos  las especies por color:
+```{r}
+
+ggplot(iris, aes(x = Sepal.Length, colour = Species)) + geom_histogram()
+
+```
+
+Diagrama de puntos con la variable Sepal.Length como eje X y Sepal.Width como eje Y. 
+Los puntos seran de color diferente en funcion del especie. 
+```{r}
+ggplot(iris, aes(x = Sepal.Length,y = Sepal.Width, colour = Species)) + geom_point()
+```
+
+Diagrama de puntos con la variable Petal.Length como eje X y Petal.Width como eje Y. 
+Los puntos seran de color diferente en funcion del especie, y el tamaño de los puntos varia en función del Sepal.Width
+
+```{r}
+ggplot(iris, aes(x = Petal.Length,y = Petal.Width, colour = Species, size = Sepal.Width)) + geom_point()
+
+```
+
+Diagrama de cajas en función de la especie y del Petal.Length.
+```{r}
+ggplot(iris, aes(x = Species, y = Petal.Length)) + geom_boxplot()
+```
+
+
+# Dataframes
+
+Un amigo nos ha enviado un fichero con una lista de canciones de Spotify 
+Se pide programar el codigo suficiente para contestar a los siguientes apartados. 
+
+Cargar ficheros y ver su estructura
+```{r}
+music <- read.csv("~/Desktop/Tercero Tecnun/Segundo semestre/Investigacion Operativa II/Machine Learning/Parcial Regresion/spotify.csv")
+
+summary(music)
+head(music)
+```
+
+¿Cuantas filas tiene el data set?
+```{r}
+nrow(music)
+```
+
+Extraer el nombre de los artistas de las primeras 20 filas del data set. 
+```{r}
+music[1:20,'artist_name']
+```
+
+
+Extraer el titulo de la canción de la fila 100.
+```{r}
+music[100,'title']
+```
+
+
+Crear un nuevo data frame llamado miLista cogiendo las primeras 20 canciones del dataset. 
+
+```{r}
+milista <- music[1:20,]
+```
+
+Crear un nuevo data frame llamado miLista cogiendo las filas de la 1 a la 20 y de la 50 a la 70.
+```{r}
+milista <- rbind(music[1:20,],music[50:70,])
+```
+
+
+
+Crear un nuevo data frame llamado miLista cogiendo las filas de la 1 a la 20 y de la 50 a la 70, pero unicamente las columnas de titulo y artista.
+```{r}
+milista <- rbind(music[1:20,c('title','artist_name')],music[50:70,c('title','artist_name')])
+```
+
+Cuántos filas tienen el año a 0?
+
+```{r}
+nrow(filter(music, music$year == 0))
+```
+
+Cambiar ceros en la columna year
+Este dataset tienen un problema porque hay algunos anios en los que aparece el valor 0. Tendremos que sustituir este valor en la columna year por NA.  
+
+```{r}
+library(dplyr)
+na_if(music$year, 0)
+```
+Omitir valores ausantes (NA)
+
+```{r}
+music <- na.omit(music)
+```
+
+
+Contar el número de veces que aparece la palabra "love" en el nombre de la canción.
+```{r}
+nrow(filter(music, grepl('love', title)))
+```
+
+Mostrar únicamente las canciones de los años 90
+
+```{r}
+filter(music, music$year >= 1990 && music$year < 2000)
+```
+
+Mostrar las 5 canciones más actuales del dataset.
+```{r}
+tail(sort(music$year),5)
+```
+

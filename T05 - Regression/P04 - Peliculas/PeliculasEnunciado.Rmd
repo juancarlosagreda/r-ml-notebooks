@@ -1,0 +1,166 @@
+---
+title: "Películas de éxito"
+output: html_notebook
+
+
+---
+
+
+Los datos en este estudio comprenden las características y clasificaciones de películas recopiladas principalmente de dos páginas web: IMDB y Rotten Tomatoes. Los datos contienen 651 películas elegidas al azar. 
+
+En este estudio, queremos analizar si la popularidad de una película (audience_score) se basa realmente en variables como:  critics score, audience rating, critics rating,imdb rating, imdb number of votes, genre, runtime, title type, Oscar awards won (actor, actress, director and picture).
+O si otras variables como ser la secuela de una película exitosa o tener una popularidad positiva, etc.,  también juegan un papel importante.
+
+SE quiere entrenar un modelo que nos permita predecir si una pelicula tendrá exito, ya que predecir la popularidad de una película, será una gran ventaja para Paramount Pictures para determinar sus producciones en el futuro.
+
+El dataset tiene 651 filas y 32 variables columna. Cada fila es una película y cada columna es una característica de la película.De las 32 variables elegiremos las siguientes 14 para realizar el análisis. 
+
+* title: Title of movie
+
+* title_type: Type of movie (Documentary, Feature Film, TV Movie)
+
+* genre: Genre of movie (Action & Adventure, Comedy, Documentary, Drama, Horror, Mystery & Suspense, Other)
+
+* runtime: Runtime of movie (in minutes)
+
+* imdb_rating: Rating on IMDB
+
+* imdb_num_votes: Number of votes on IMDB
+
+* critics_rating: Categorical variable for critics rating on Rotten Tomatoes (Certified Fresh, Fresh, Rotten)
+
+* critics_score: Critics score on Rotten Tomatoes
+
+* audience_rating: Categorical variable for audience rating on Rotten Tomatoes (Spilled, Upright)
+
+* audience_score: Audience score on Rotten Tomatoes
+
+* best_pic_nom: Whether or not the movie was nominated for a best picture Oscar (no, yes)
+
+* best_pic_win: Whether or not the movie won a best picture Oscar (no, yes)
+
+* best_actor_win: Whether or not one of the main actors in the movie ever won an Oscar (no, yes) – note that this is not necessarily whether the actor won an Oscar for their role in the given movie
+
+* best_actress_win: Whether or not one of the main actresses in the movie ever won an Oscar (no, yes) – not that this is not necessarily whether the actresses won an Oscar for their role in the given movie 
+* best_dir_win: Whether or not the director of the movie ever won an Oscar (no, yes) – not that this is not necessarily whether the director won an Oscar for the given movie
+
+
+Cargamos las librerias necesarias: 
+```{r}
+library(ggplot2)
+library(dplyr)
+library(corrplot)
+library(caret)
+library(statsr)
+library(gridExtra)
+library(GGally)
+library(ggthemes)
+library(DMwR)
+
+```
+
+# Cargar el dataset
+Cargamos el fichero: 
+```{r}
+load("movies.Rdata")
+summary(movies)
+head(movies)
+```
+
+Creamos un nuevo dataframe incluyendo únicamente las 14 variables que hemos seleccionado para el estudio. 
+
+Pero como es mi estudio, decido dejar los factores (excepto los bins) afuera y centrarme en los ints y doubles
+
+```{r}
+movies_new <- movies [,c('runtime', 'imdb_rating', 'imdb_num_votes', 'critics_rating', 'critics_score', 'audience_rating', 'audience_score', 'best_pic_win', 'best_actor_win', 'best_actress_win', 'best_dir_win')]
+head(movies_new)
+str(movies_new)
+summary(movies_new)
+```
+
+Habiendo visto el summary, queremos comprobar que no hayan valores nulos en el dataset, ya que esto pudiera
+hacer que el estudio sea erroneo.
+
+```{r}
+#Primero vemos si hay nulos
+any(is.na(movies_new))
+
+#Ahora vemos cuantos nulos hay
+sum(any(is.na(movies_new)))
+#Hay solo 1 nulo, por tanto lo eliminamos...
+mset <- na.omit(movies_new)
+```
+
+Ahora que purificamos nuestro dataset, queremos una representacion grafica de las relaciones que tienen las variables de nuestro dataset. Para esto elegimos el histograma.
+
+```{r}
+#Tenemos la siguiente dependencia..
+library(psych)
+#Ahora graficamos!
+#multi.hist(x = movies, dcol = c("blue", "red"), dlty = c("dotted", "solid"))
+#Nos da error (obviamente), porque la mayoria de nuestras variables son strings y no numericas
+#y por tanto graficamos para ver correlaciones como en estadistica industrial
+plot(mset)
+```
+
+Ahora dividiremos los datos en training y testing sets (asi es como alimentaremos a nuestro algoritmo)
+
+--> 75% sera training
+--> 25% sera testing
+
+```{r}
+# We start the list of random numbers at the position 123
+set.seed(123)
+validation_index <- createDataPartition(mset$audience_score, p=0.75, list=FALSE)
+# select 20% of the data for validation
+trainset <- mset[-validation_index,]
+# use the remaining 80% of data to training and testing the models
+testset <- mset[validation_index,]
+```
+
+Ahora empezamos a formar el modelo de regresion..
+Para esto 
+```{r}
+#Misma formula de estadistica para reg multiple, la diferencia es que lo haremos con el training set
+modelo <- lm(formula = audience_score ~ ., data = trainset)
+summary(modelo)
+```
+Ahora graficamos el modelo
+```{r}
+#Misma formula de estadistica para reg multiple, la diferencia es que lo haremos con el training set
+par(mfrow = c(2,2))
+plot(modelo)
+```
+Podemos ver que los graficos se ven prometedores (los residuos se ven normales y siguen distribucion normal segun nuestro Q-Q plot)
+
+Ahora queremos predecir a partir del modelo
+
+```{r}
+#Usamos 95% de confianza
+prediccion <- predict(object = modelo, newdata = testset, llevel = 0.95)
+print(prediccion)
+```
+Usaremos este modelo que acabamos de obtener con mi sample de testeo
+
+```{r}
+comp <- data.frame(cbind(actuals = testset$audience_score, predicted = prediccion))
+comp
+```
+Con esto, podemos obtener el error del test..
+
+```{r}
+testerr <- regr.eval(comp$actuals,comp$predicted)
+testerr
+```
+Y tambien podemos obtener el training error rate
+
+```{r}
+modeloTrain <- predict(object = modelo, newdata = trainset, level = 0.95)
+compTrainer <- data.frame(cbind(actuals = trainset$audience_score, predicted = modeloTrain, level = 0.95))
+trainerr <- regr.eval(compTrainer$actuals, compTrainer$predicted)
+
+trainerr
+```
+
+Podemos ver que nuestro train error es inferior a nuestro test error y por tanto estamos overfitting.
+Puede ser buena idea evaluar otras combinaciones de variables

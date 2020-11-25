@@ -1,0 +1,271 @@
+---
+title: "Comparativa de modelos de clasificacion"
+output: html_notebook
+source: https://rpubs.com/Yatharth96/265181
+---
+
+
+Vamos a comparar los diferentes modelos de clasificacion vistos en clase con el dataset iris. 
+Este dataset contiene  50 muestras de cada una de tres especies de Iris (Iris setosa, Iris virginica e Iris versicolor). Para cada muestra, se han evaluado 4 características: el largo y ancho del sépalo y pétalo, en centímetros. 
+
+
+El objetivo de este ejercicio es comparar la eficacia de diferentes modelos de clasificación a la hora de clasificar estas flores. 
+
+# Cargar las librerias y el dataset
+
+install.packages("gmodels")
+install.packages("e1071")
+
+install.packages("ggplot")
+install.packages("ggplot2")
+install.packages("gridExtra")
+install.packages("randomForest")
+
+
+
+```{r}
+library(caret)
+library(randomForest)
+library(ggplot2)
+
+library(rpart)
+library(rpart.plot)
+library(gmodels)
+library(e1071)  # SVM
+library(gridExtra)
+
+library(party)
+library(kernlab)
+
+```
+
+Cargamos el dataset y visualizamos sus datos:
+
+```{r}
+data(iris)
+str(iris)
+summary(iris)
+nrow(iris)
+ncol(iris)
+
+
+```
+
+
+# Analisis exploratorio
+
+Vamos a dibujar las variables para tratar de identificar las relaciones entre las variables. 
+
+```{r}
+g1 = ggplot(iris,aes(x =Sepal.Length,y = Sepal.Width,color = Species)) + geom_point() + ggtitle("Sepal.Width vs Sepal.Length")
+
+g2 = ggplot(iris,aes(x =Petal.Length,y = Petal.Width,color = Species)) + geom_point() + ggtitle("Petal.Width vs Petal.Length")
+
+g3 = ggplot(iris,aes(x =Petal.Length,y = Sepal.Length,color = Species)) + geom_point() + ggtitle("Sepal.Length vs Petal.Length")
+
+g4 = ggplot(iris,aes(x =Petal.Width,y = Sepal.Width,color = Species)) + geom_point()  + ggtitle("Sepal.Width vs Petal.Width")
+
+grid.arrange(g1,g2,g3,g4,nrow = 2)
+```
+
+
+Si queremos ver cómo está distribuido el dataset en cuanto a tipos de flores.
+
+```{r}
+ggplot(iris, aes(x=Species, color=Species))+
+  geom_bar(stat="count", aes (fill=Species))+
+  xlab("Tipos") + ylab("Contador")+
+  geom_text(stat='count', aes(label=..count..), vjust=-0.5)
+ 
+```
+
+# Creando las datos para entrenamiento y testeo
+
+```{r}
+set.seed(100)  # Para reproducir los mismos resultados
+IndicesEntrenamiento <- createDataPartition(y = iris$Species,
+                                            p = 0.75,
+                                            list = FALSE)
+datosTrain <- iris[IndicesEntrenamiento,]
+datosTest <- iris[-IndicesEntrenamiento,]
+```
+
+Revisamos el número de filas de cada conjunto de datos.
+
+```{r}
+nrow(datosTrain)
+nrow(datosTest)
+
+```
+
+Revisamos la distribución de clases en el conjunto de datos para el entrenamiento y test con la función table. 
+```{r}
+table(datosTrain$Species)
+
+```
+```{r}
+table(datosTest$Species)
+```
+
+# Comparativa de métodos de clasificación
+
+
+## El comando train (función del paquete caret)
+
+Se puede usar este comando único para aplicar un gran número de métodos de clasificación determinando (en caso necesario) los valores óptimos de sus parámetros mediante validación cruzada u otros métodos de remuestreo. Para usar  train en general es necesario:
+
+* Elegir el método de clasificación que queremos usar. El catálogo de todos los métodos disponibles se puede consultar en este enlace. Una información técnica detallada de cada método se puede obtener con el comando getModelInfo.
+
+* Si el método de clasificación requiere determinar parámetros, es necesario fijar cuáles y en qué rango de valores.
+
+* También hay que definir el método de remuestreo que se va a utilizar para determinar estos parámetros.
+
+## Decision Trees
+También se podría hacer usando: 
+
+modeloTrees <- rpart(formula = Species ~ ., data = datosTrain)
+
+Después mostraremos las caracteristicas del modelo:
+
+```{r}
+modeloTrees<-train(Species ~ . ,data =datosTrain, method="rpart")
+modeloTrees
+
+```
+
+
+Dibujar el arbol:
+
+```{r}
+# El modelo final del arbol se guarda en este atributo
+modeloTrees$finalModel
+
+rpart.plot(modeloTrees$finalModel, main="Classification Tree2")
+
+```
+## Predecir los valores para el conjunto de test
+
+```{r}
+# Predict
+prediccionTrees=predict(modeloTrees, datosTest)
+
+```
+
+
+
+
+Indicadores de accuracy, precision, sensitivity y especificidad: 
+
+
+```{r}
+# Genera una matriz de confusion
+confusionMatrix(prediccionTrees, datosTest$Species)$table
+# Mostrar la precision
+confusionMatrix(prediccionTrees, datosTest$Species)$overall
+confusionMatrix(prediccionTrees, datosTest$Species)$byClass
+
+```
+
+## Random Forest
+
+```{r}
+modeloRF<-train(Species ~ . ,data =datosTrain, method="cforest")
+modeloRF
+
+```
+
+```{r}
+modeloRF$modelInfo
+modeloRF$finalModel
+
+```
+
+Las variables más significativas en el modelo son:
+
+```{r}
+modeloRF.varImp = varImp(modeloRF)
+plot(modeloRF.varImp, main = "Importance of all Variables for 'rf' model")
+```
+
+```{r}
+# Predict
+prediccionRF<-predict(modeloRF, datosTest)
+
+```
+
+Indicadores de accuracy, precision, sensitivity y especificidad: 
+
+
+```{r}
+# Genera una matriz de confusion
+confusionMatrix(prediccionRF, datosTest$Species)$table
+# Mostrar la precision
+confusionMatrix(prediccionRF, datosTest$Species)$overall
+confusionMatrix(prediccionRF, datosTest$Species)$byClass
+
+```
+
+
+## k-Nearest Neighbours
+```{r}
+
+modeloKNN<-train(Species ~ . ,data =datosTrain, method="knn")
+modeloKNN
+
+```
+
+```{r}
+plot(modeloKNN)
+
+```
+
+
+```{r}
+# Predict
+prediccionKNN=predict(modeloKNN, datosTest)
+
+```
+
+
+Métricas para evaluar el modelo: 
+```{r}
+# Genera una matriz de confusion
+confusionMatrix(prediccionKNN, datosTest$Species)$table
+# Mostrar la precision
+confusionMatrix(prediccionKNN, datosTest$Species)$overall
+confusionMatrix(prediccionKNN, datosTest$Species)$byClass
+```
+
+
+
+##Support Vector Machine (SVM)
+
+
+```{r}
+modeloSVM=train(Species~., data=datosTest, 
+                method="svmLinear")
+
+modeloSVM
+
+```
+
+
+```{r}
+# Predict
+prediccionSVN=predict(modeloSVM, datosTest)
+
+```
+
+
+Métricas para evaluar el modelo: 
+```{r}
+# Genera una matriz de confusion
+confusionMatrix(prediccionSVN, datosTest$Species)$table
+# Mostrar la precision
+confusionMatrix(prediccionSVN, datosTest$Species)$overall
+confusionMatrix(prediccionSVN, datosTest$Species)$byClass
+```
+
+
+
+¿Qué método es mejor?

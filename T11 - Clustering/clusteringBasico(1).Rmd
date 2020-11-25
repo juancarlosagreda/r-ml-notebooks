@@ -1,0 +1,204 @@
+---
+title: "Clustering: Ejemplo básico"
+output: html_notebook
+Source: https://rpubs.com/rdelgado/399475
+---
+
+Este ejemplo realiza una introducción  a dos de los modelos de agrupamiento o clustering más conocidos: K-means, y el Agrupamiento Jerárquico o Hierarchical Clustering. 
+Estos son modelos de clasificación no supervisados ya que (a diferencia de los modelos supervisados en donde los datos de entrada tienen etiquetas que los identifican) en este caso no se conoce de antemano las clases a las que pertenecen los datos, sino que es trabajo del modelo encontrar semejanzas entre ellos y así agruparlos según las características intrínsecas de sus variables. 
+A lo largo de la práctica, estudiaremos cómo se implementan los modelos de clustering en R, y analizaremos los resultados a partir de un conjunto de datos del fichero *Clusters.csv*.
+
+Usaremos las siguientes librerias: ggplot2, ggdendro
+
+```{r}
+install.packages("ggplot2")
+install.packages("ggdendro")
+
+```
+
+```{r}
+library(ggplot2)
+library(ggdendro)
+```
+
+Cargar el fichero y ver su contenido. 
+
+```{r}
+dataClusters<-read.csv(file="Clusters.csv")
+
+summary(dataClusters)
+str(dataClusters)
+head(dataClusters)
+
+
+
+```
+
+Vamos a cambiar los nombres de las columnas. En vez de V1 y V2 les llamaremos X e Y.
+
+```{r}
+nombres=c("X", "Y")
+colnames(dataClusters)<-nombres
+head(dataClusters)
+str(dataClusters)
+```
+
+
+El dataset está compuesto por 788 observaciones de 2 variables.
+Visualizaremos los datos para observar su distribución de manera más clara, mediante un diagrama de dispersión. 
+
+```{r}
+ggplot() + 
+  geom_point(aes(x = X, y = Y), data = dataClusters, alpha = 0.5) + 
+  ggtitle('Conjunto de Datos')
+```
+
+Como puede verse , en el conjunto de datos se pueden diferenciar entre 5 a 7 grupos. El objetivo de los modelos de agrupamiento será entonces identificar de manera precisa tales grupos y, sobre todo, las fronteras de cada uno, de manera que cada observación pueda ser asociada a un clúster específico. 
+
+# K-Means Clustering
+
+El método de K-Means basa su funcionamiento en agrupar los datos de entrada en un total de k conjuntos definidos por un centroide, cuya distancia con los puntos que pertenecen a cada uno de los datos es la menor posible. Los pasos del algoritmo son:
+
+1. Definir un total de k centroides al azar.
+2. Calcular las distancias de cada uno de los puntos de entrada a los k centroides, y asignar cada punto al centroide cuya distancia sea menor.
+3. Actualizar la posición de los k centroides, calculando la posición promedio de todos los puntos que pertenecen a cada clase.
+4. Repetir los pasos 2 y 3 hasta que los centroides no cambien de posición y, por lo tanto, las asignaciones de puntos entre clases no cambie.
+
+Sin embargo, la cantidad óptima de centroides *k* a utilizar no  se conoce necesariamente de antemano, por lo que es necesario aplicar una técnica conocida como el Elbow Method a fin de determinar dicho valor. Básicamente, este método busca seleccionar la cantidad ideal de grupos a partir de la optimización de la WCSS (Within Clusters Summed Squares).
+
+Por otro lado, ya que los centroides iniciales se generan al azar, pueden obtenerse resultados distintos en cada ejecución del algoritmo, e incluso debido a las ubicaciones iniciales de los centroides, obtenerse al final soluciones que son mínimos locales en vez del global del conjunto de datos. Para solventar este problema, se propuso el algoritmo de k-means++ a fin de escoger los centroides iniciales que garantizaran la convergencia adecuada del modelo.
+
+Entonces, para implementar el modelo de K-Means, comencemos por determinar la cantidad óptima de centroides a utilizar a partir del Elbow Method. Para ello, aplicaremos la función kmeans al conjunto de datos, variando en cada caso el valor de k, y acumulando los valores de WCSS obtenidos:
+
+```{r}
+set.seed(123)
+wcss <- vector()
+for(i in 1:20){
+  wcss[i] <- sum(kmeans(dataClusters, i)$withinss)
+}
+```
+
+Una vez calculados los valores de WCSS en función de la cantidad de centroides k, vamos a graficar los resultados:
+
+```{r}
+ggplot() + geom_point(aes(x = 1:20, y = wcss), color = 'blue') + 
+  geom_line(aes(x = 1:20, y = wcss), color = 'blue') + 
+  ggtitle("Elbow method") + 
+  xlab('Cantidad de Centroides k') + 
+  ylab('WCSS')
+```
+A partir de la curva obtenida podemos ver cómo a medida que se aumenta la cantidad de clusters, el valor de WCSS disminuye de tal forma que la gráfica adopta una forma de codo.
+
+Para seleccionar el valor óptimo de k, se escoje entonces ese punto en donde ya no se dejan de producir variaciones importantes del valor de WCSS al aumentar k. En este caso, vemos que esto se produce a partir de k >= 7, por lo que evaluaremos los resultados del agrupamiento, por ejemplo, con los valores de 7, 8 y 9 a fin de observar el comportamiento del modelo.
+
+Finalmente, podemos aplicar el algoritmo con la cantidad de k seleccionada:
+
+```{r}
+set.seed(1234)
+modeloKMeans <- kmeans(dataClusters, 7, iter.max = 1000)
+```
+
+En donde iter.max son el máximo de iteraciones a aplicar al algoritmo, y nstart es la cantidad de conjuntos de centroides que emplea internamente el mismo para ejecutar sus cálculos.
+
+Veamos el resultado del agrupamiento
+
+Primero, vemos el resultado de los clusters. ¿Sabes interpretar los valores que se muestran?
+```{r}
+modeloKMeans
+```
+
+Segundo, su representación grafica.
+```{r}
+dataClusters$cluster <- modeloKMeans$cluster
+ggplot() + geom_point(aes(x = X, y = Y, color = cluster), data = dataClusters, size = 2) +
+  scale_colour_gradientn(colours=rainbow(4)) +
+  geom_point(aes(x = modeloKMeans$centers[, 1], y = modeloKMeans$centers[, 2]), color = 'black', size = 3) + 
+  ggtitle('Clusters de Datos con k = 7 / K-Means') + 
+  xlab('X') + ylab('Y')
+```
+En la gráfica se representa cada cluster con un color diferente, y además se muestra la posición de cada centroide en negro.
+
+Como puede verse, con k = 7 el modelo asigna clases consistentes a los datos de entrada, en especial al observar los agrupamientos que existen en toda la zona superior y derecha de la gráfica en donde los grupos son evidentes. Mientras tanto, los datos del grupo inferior izquierdo son agrupados en 3 clases distintas pero se observa que la distribución de puntos es adecuada para cada grupo.
+
+Al validar con k = 8 y 9 tenemos:
+
+```{r}
+set.seed(123)
+modeloKMeans2 <- kmeans(dataClusters, 8, iter.max = 1000, nstart = 10)
+dataClusters$cluster <- modeloKMeans2$cluster
+ggplot() + geom_point(aes(x = X, y = Y, color = cluster), data = dataClusters, size = 2) +
+  scale_colour_gradientn(colours=rainbow(4)) +
+  geom_point(aes(x = modeloKMeans2$centers[, 1], y = modeloKMeans2$centers[, 2]), color = 'black', size = 3) + 
+  ggtitle('Clusters de Datos con k = 8 / K-Means') + 
+  xlab('X') + ylab('Y')
+
+
+set.seed(123)
+modeloKMeans3 <- kmeans(dataClusters, 9, iter.max = 1000, nstart = 10)
+dataClusters$cluster <- modeloKMeans3$cluster
+ggplot() + geom_point(aes(x = X, y = Y, color = cluster), data = dataClusters, size = 2) +
+  scale_colour_gradientn(colours=rainbow(4)) +
+  geom_point(aes(x = modeloKMeans3$centers[, 1], y = modeloKMeans3$centers[, 2]), color = 'black', size = 3) + 
+  ggtitle('Clusters de Datos con k = 9 / K-Means') + 
+  xlab('X') + ylab('Y')
+```
+
+Al incrementar el valor de k tendremos entonces agrupamientos que recogen partes específicas de los datos de entrada, incluso llegando a dividir en dos grupos distintos a lo que inicialmente parece ser un solo grupo, como es el caso de los datos presentes en la parte superior izquierda de la gráfica cuando k = 9. Así, vemos cómo el algoritmo de K-Means es capaz de producir de manera natural estos agrupamientos a partir de las semejanzas de los datos, y dichas clases generadas de hecho concuerdan con la intuición propia al observar los datos de entrada.
+
+# Hierarchical Clustering
+
+El Agrupamiento Jerárquico es un método de agrupamiento que basa su funcionamiento en encontrar jerarquías en los datos de entrada a partir de generar grupos basados en la cercanía o semejanza de los datos. Se empieza calculando los puntos de los datos de entrada que estén más cercanos y se crea un grupo entre ellos. Luego se calculan los siguientes pares más cercanos y de manera ascendente se van generando grupos de clases que, de manera visual podrán observarse a partir de la construcción de un Dendrograma. Las clases, entonces, estarán definidas por la cantidad de líneas verticales del dendrograma (como veremos más adelante), y la selección del número de clases óptima para el conjunto de datos se podrá estimar de este mismo diagrama.
+
+Así, para implementar el agrupamiento jerárquico en R y construir el dendrograma, se hace uso de la función *hclust*. Además, usaremos la función *ggdendrogram* del paquete *ggdendro* para visualizar el dendrograma:
+
+```{r}
+
+dendrograma <- hclust(dist(dataClusters, method = 'euclidean'), method = 'ward.D')
+ggdendrogram(dendrograma, rotate = FALSE, labels = FALSE, theme_dendro = TRUE) + 
+  labs(title = "Dendrograma")
+```
+
+En el eje horizontal del dendrograma tenemos cada uno de los datos que componen el conjunto de entrada, mientras que en el eje vertical se representa la distancia euclídea que existe entre cada grupo a medida que éstos se van jerarquizando. 
+Cada línea vertical del diagrama representa un agrupamiento. Los grupos o clústers se van formando progresivamente hasta tener un solo gran grupo determinado por la línea horizontal superior. Así, al ir descendiendo en la jerarquía, vemos que de un solo grupo pasamos a 2, luego a 3, luego a 6, y así sucesivamente. 
+Una manera de determinar entonces la cantidad de clusters adecuados es cortando el dendrograma a aquella altura del diagrama que mejor representa los datos de entrada.
+
+Así, para nuestros datos, veamos los resultados para k = 3, 4, 6 y 7. A fin de obtener los resultados del agrupamiento, se hace uso de la función  *cutree*, incorporando como parámetro tanto el modelo de agrupamiento como la cantidad de clases k:
+
+```{r}
+modeloJerarquico <- hclust(dist(dataClusters, method = 'euclidean'), method = 'ward.D')
+gruposModelo1 <- cutree(modeloJerarquico, k = 3)
+dataClusters$cluster <- gruposModelo1
+```
+
+```{r}
+ggplot() + geom_point(aes(x = X, y = Y, color = cluster), data = dataClusters, size = 2) +
+  scale_colour_gradientn(colours=rainbow(4)) +
+  ggtitle('Clusters de Datos con k = 3 / Agrupamiento Jerárquico') + 
+  xlab('X') + ylab('Y')
+```
+En el caso de k = 3, se observa que el algoritmo selecciona de manera adecuada los 3 grandes grupos generales que presenta el conjunto de datos. 
+
+
+```{r}
+modelo2 <- cutree(modeloJerarquico, k = 4)
+dataClusters$cluster <- modelo2
+ggplot() + geom_point(aes(x = X, y = Y, color = cluster), data = dataClusters, size = 2) +
+  scale_colour_gradientn(colours=rainbow(4)) +
+  ggtitle('Clusters de Datos con k = 4 / Agrupamiento Jerárquico') + 
+  xlab('X') + ylab('Y')
+```
+
+```{r}
+modelo3 <- cutree(modeloJerarquico, k = 7)
+dataClusters$cluster <- modelo3
+ggplot() + geom_point(aes(x = X, y = Y, color = cluster), data = dataClusters, size = 2) +
+  scale_colour_gradientn(colours=rainbow(4)) +
+  ggtitle('Clusters de Datos con k = 7 / Agrupamiento Jerárquico') + 
+  xlab('X') + ylab('Y')
+```
+Se observa que al igual que el caso de K-Means, progresivamente se van obteniendo agrupamientos que separan las clases visibles en el conjunto de datos de una manera adecuada.
+Aunque no tienen información previa de etiquetas o clases predefinidas de los datos, los algoritmos de clustering pueden encontrar las clases naturales que existen en los datos a partir de las simulitudes entre ellos.
+
+
+
+

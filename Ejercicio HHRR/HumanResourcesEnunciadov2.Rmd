@@ -1,0 +1,296 @@
+---
+title: "Recursos Humanos"
+output:
+html_document:
+df_print: paged
+
+---
+
+
+Una empresa con un número alto de trabajadores quiere comprender por qué algunos de sus mejores y más experimentados empleados se van prematuramente. La compañía también desea predecir qué empleados valiosos se irán después.
+Para ello, nos proporciona un dataset que contiene 10 diferentes características de 14999 registros pertenencientes a empleados de distintos sectores. Contiene los siguientes atributos:
+
+* Satisfaction level -Nivel de Satisfacción (de 0 a 1)
+* Last evaluation -Ultima evaluación
+* Number project - Número de proyectos
+* Average monthly hours -Promedio de horas mensuales (en horas)
+* Time spend company - Tiempo en la empresa (en anios)
+* Work accident - Accidente de trabajo (Si/No)
+* Left - Abandono de la empresa (Si/No)
+* Promotion last 5 years - Promoción en los últimos 5 anios (Si/No)
+* Sales -Sector (p.ej.: recursos humanos, soporte, marketing, etc.)
+* Salary - Salario (alto, medio, bajo)
+
+
+Tenemos dos objetivos: primero, queremos entender por qué los empleados valiosos se van, y segundo, queremos predecir quién se irá después.
+
+Por lo tanto, proponemos trabajar con el departamento de recursos humanos para recopilar datos relevantes sobre los empleados y comunicar el efecto significativo que podría explicar y predecir la partida de los empleados.
+
+
+
+```{r}
+Sys.setenv(LANG = "es")
+```
+
+
+Cargamos las librerías: 
+
+```{r}
+library(dplyr) #Data Manipulation
+library(caTools) #Split Datasets
+library(lattice) #Plots
+library(ggplot2) #Plots
+library(caret) #Machine Learning 
+library(rpart) #Decission Tree Algorithm
+library(e1071) #Random Forest Algorithm
+#library(ranger) #Random Forest Algorithm
+library(kernlab) #Support Vector Machine
+
+if (!require("corrplot")){ install.packages("corrplot"); library(corrplot)}
+```
+
+Cargamos el dataset y mostramos por pantalla los primeros elementos para ver su estructura.
+```{r}
+dataRRHH <- read.csv(file ="RecursosHumanos.csv", sep=",", header = TRUE)
+head(dataRRHH)
+```
+
+
+# Análisis exploratorio de los datos 
+Primero vamos a ver si hay algún registro que no está completo.En nuestro caso, comprobaremos que todos los registros están completos.
+
+
+```{r}
+sum(is.na(dataRRHH))
+```
+
+Mostrar los estadísticos pertinentes con la función summary. 
+```{r}
+summary(dataRRHH)
+```
+ 
+¿Qué puedes concluir?
+ Podemos ver que la mayoria de satisfaccion de los empleados es mala, porque su media es 60%, puede ser por la cantidad de trabajo que tienen, por las horas que meten, por su salario, o por si han recibido promociones. Otro factor que hay que notar es que hay muy pocos accidentes y que muy pocos renuncian, al igual que muy pocos son promovidos. Tambien, la mayoria de la empresa tiene menos de 5 años en ella. 
+ 
+ 
+A continuacion realizaremos varios gráficos para analizar relaciones entre las variables.
+ 
+Realizar un gráfico para observar la distribucion del nivel de satisfacción en general y explicar las conclusiones.
+ 
+```{r}
+ggplot(dataRRHH, aes(x = satisfaction_level)) + geom_histogram()
+ggplot(dataRRHH, aes(x = satisfaction_level)) + geom_boxplot()
+```
+ 
+
+Ahora podemos ver que mis conclusiones pasadas pueden no ser muy acertadas, ya que hay un sesgo muy claro a la izquierda, poniendo a la mayoria de los empleados en un buen nivel de satisfaccion.
+ 
+Realizar el mismo gráfico anterior diferenciando por tipo de salario y explicar lo que representa.
+
+```{r}
+ggplot(dataRRHH, aes(x = satisfaction_level, colour = salary)) + geom_histogram()
+```
+
+Vamos a analizar si el nivel de satisfacción está directamente relacionado con el salario mediante un boxplot. 
+```{r}
+ggplot(dataRRHH, aes(x = satisfaction_level, y = salary)) + geom_boxplot()
+```
+¿Qué conclusión sacas?
+
+Podemos ver que en todos los tipos de salarios hay emplados satisfechos y empleados no satisfechos, pero aumenta mucho la variabilidad de satisfaccion cuando el salario es mas bajo.
+
+
+ 
+
+Ahora vamos a analizar si el nivel de satisfacción es diferente para las personas que dejan el empleo o las que se quedan en la empresa.
+ 
+```{r}
+#Primero los que se quedan
+seQuedan <- filter(dataRRHH, left == 0)
+ggplot(seQuedan, aes(x = satisfaction_level)) + geom_histogram() + ggtitle("Satisfaccion de empleados que se quedan")
+ggplot(seQuedan, aes(x = satisfaction_level)) + geom_boxplot() + ggtitle("Satisfaccion de empleados que se quedan")
+
+#Luego los que se van
+seVan <- filter(dataRRHH, left == 1)
+ggplot(seVan, aes(x = satisfaction_level)) + geom_histogram() + ggtitle("Satisfaccion de empleados que se van")
+ggplot(seVan, aes(x = satisfaction_level)) + geom_boxplot() + ggtitle("Satisfaccion de empleados que se van")
+```
+ 
+Comenta el grafico.
+Podemos ver que la mayoria de empleados que se van es porque no estan satisfechos con su trabajo, aunque hayan unos que si y otros que mas o menos. Sin embargo, estan divisiones de satisfaccion estan mucho mas acentuadas.
+
+
+ 
+
+Ahora vamos a analizar el nivel de satisfacción con el numero de proyectos. 
+```{r}
+ggplot(dataRRHH, aes(x = satisfaction_level, y = as.factor(number_project))) + geom_boxplot()
+```
+
+Comenta el grafico.
+Podemos ver que los que tienen 2 proyectos no estan satisfechos con el trabajo, y estan mucho menos satisfechos los que tienen 6 proyectos. Es raro que el que tenga 7 proyectos este satisfecho. Tambien, es raro que el que tenga entre 3 y 5 proyectos que no este satisfecho.
+
+
+
+
+Seleccionarmos las variables numericas del dataset y graficaremos la matriz de correlaciones. 
+ 
+```{r}
+myData <- data.frame(dataRRHH[, c("satisfaction_level","last_evaluation","number_project","average_montly_hours","time_spend_company"
+                                  ,"Work_accident","left","promotion_last_5years")])
+sum(is.null(myData)) #No null values
+
+library(corrgram)
+corrplot(corrgram(myData), method = "number", type = "lower")
+
+```
+ 
+
+Podemos ver que el factor que mas afecta al nivel de satisfaccion de un empleado es left.
+
+Vamos a realizar un gráfico del nivel de satisfacción con los diferentes tipos de sector. Decide cuál es la mejor representación para ver esto. 
+
+```{r}
+ggplot(myData, aes(x = satisfaction_level, group = left)) + geom_boxplot()
+```
+
+¿Qué conclusiones sacas?
+
+Podemos ver que el hecho de que un empleado se haya ido afecta mucho su variabilidad de estar satisfecho, tendiendo a no estarlo.
+
+
+Ahora vamos a analizar únicamente aquellos trabajadores que han abandonado la empresa, para lo que dividiremos el dataset en función de si han dejado o no la empresa. 
+
+Para hacer esto, haremos algo así donde nombreDataset será el nombre de la variable donde habéis cargado el dataset original. 
+
+dataLeft<-nombreDataset[nombreDataset$left==1, ]
+dataStay<-nombreDataset[nombreDataset$left==0, ]
+ 
+```{r}
+#Done
+#seQuedan
+#seVan
+```
+
+Mostramos mediante histogramas las siguentes variables:  satisfaction level, last evaluation, average monthly hours y salary. 
+
+
+```{r}
+ggplot(myData, aes(x = satisfaction_level)) + geom_histogram()
+ggplot(myData, aes(x = last_evaluation)) + geom_histogram()
+ggplot(myData, aes(x = average_montly_hours)) + geom_histogram()
+ggplot(dataRRHH, aes(x = salary)) + geom_bar()
+```
+ 
+qué conclusiones sacas? 
+
+Podemos ver que la mayoria de empleados estan satisfechos con su trabajo, aunque hay una buena porcion que no lo esta. Sin embargo, se puede ver una mejora clara con la evaluacion pasada. Podemos ver tambien que hay dos picos de horas de trabajo, con diferencia de 100 horas mensuales. Es decir, que los empleados o trabajan demasiado o muy poco. Tambien podemos ver que hay muy pocos con paga alta, y muchisimos con paga mediana-baja.
+ 
+```{r}
+ggplot(dataRRHH, aes(x = average_montly_hours, color = salary)) + geom_histogram()
+```
+ 
+ Vamos a obtener la matriz de correlaciones para identificar las razones por las que la gente buena se va de la compania. 
+ 
+```{r}
+correlacion<-round(cor(myData), 1)
+corrplot(correlacion, method="number", type="lower")
+
+```
+ 
+Explicar las conclusiones.
+
+Podemos ver que las variables que mas correlacion tienen con el nivel de satisfaccion son left, number of projects, accidents, time spent in the company y last evaluation.
+
+ 
+# Machine Learning
+
+Ahora vamos a evaluar el nivel de confianza (Accuracy) para predecir si una persona se quedará o no en la empresa (‘left’), mediante diferentes algoritmos de clasificación. Utilizaremos el K-Nearest Neightbours, Decission Tree, Random Forest y Support Vector Machine.
+
+Seleccionamos como dataset a aquellas personas que se consideran valiosas para la empresa, es decir aquellas que han recibido una evaluación igual o superior a 0.70, tenían una antiguedad de por lo menos 4 años y han trabajado por lo menos en 5 proyectos. 
+
+
+IMPORTANTE: en los modelos de clasificación la variable a predecir tiene que ser de tipo factor. Verifica que es así y si no tendrás que convertir esta columna a factor.
+
+```{r}
+#Primero organizamos los datos con los que vamos a trabajar y descargamos los paquetes
+#Los empleados mas valiosos
+mlSet <- filter(dataRRHH, satisfaction_level >= 0.7)
+mlSet <- filter(mlSet, time_spend_company >= 4)
+mlSet <- filter(mlSet, number_project >= 5)
+
+#Hacemos la variable que queremos predecir un factor (left)
+mlSet$left <- as.factor(mlSet$left)
+```
+
+Vamos a dividir este dataset que únicamente tiene los empleados que la empresa considera valiosos en un dataset para entrenamiento y otro para validación. 
+
+```{r}
+set.seed(100)
+myIndex <- createDataPartition(y = mlSet$left,
+                               p = 0.75,
+                               list = FALSE)
+training <- mlSet[myIndex, ]
+testing <- mlSet[-myIndex, ]
+
+nrow(training)
+nrow(testing)
+```
+Podemos ver que tenemos 676 rowa para entrenamiento y 225 para testeo, verificando que la proporcion de la division de los datos sea correcta para proceder.
+
+
+## Trees
+```{r}
+#Train the model
+treeModel <- train(left ~ ., data = training, method = "rpart")
+#Test the model
+predictTree <- predict(treeModel, testing)
+#Evaluamos el nivel de confianza (accuracy) del modelo de Machine Learning
+confusionMatrix(predictTree, testing$left)$overall
+```
+Obtenemos un accuracy del 91%
+
+
+##Support Vector Machine
+```{r}
+#Train the model
+svnModel <- train(left ~ ., data = training, method = "svmLinear")
+#Predict
+predictSVN <- predict(svnModel, testing)
+#Evaluamos el nivel de confianza (accuracy) del modelo de Machine Learning
+confusionMatrix(predictSVN, testing$left)$overall
+```
+Obtenemos un accuracy del 89%
+
+
+##KNN
+```{r}
+#Train the model
+knnModel <- train(left ~ ., data = training, method = "knn")
+#Predict
+predictKNN <- predict(knnModel, testing)
+#Evaluamos el nivel de confianza (accuracy) del modelo de Machine Learning
+confusionMatrix(predictKNN, testing$left)$overall
+```
+Obtenemos un accuracy del 85%
+
+
+##Random Forest
+Usaremos el método ranger en vez de cforest. 
+```{r}
+#Train the model
+randomForestModel <- train(left ~ ., data = training, method = "ranger")
+#Predict
+predictRandomForest <- predict(randomForestModel, testing)
+#Evaluamos el nivel de confianza (accuracy) del modelo de Machine Learning
+confusionMatrix(predictRandomForest, testing$left)$overall
+```
+Obtenemos un accuracy del 99%
+
+
+
+#Conclusiones
+
+Podemos ver que el algoritmo de ML adecuado para este modelo de datos es el de Random Forest, ya que tenemos 99% de accuracy. 
+
+

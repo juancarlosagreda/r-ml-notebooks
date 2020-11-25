@@ -1,0 +1,178 @@
+---
+title: 'R Notebook: Warm up exercise with data frames'
+output:
+  pdf_document: default
+  html_notebook: default
+  html_document:
+    df_print: paged
+---
+
+This is a R Notebook that helps you to start working with data frames.
+
+A data frame is a table or a two-dimensional array-like structure in which each column contains values of one variable and each row contains one set of values from each column.
+
+
+## Fist step: Establish your working directory
+Set your working directory with setwd ("P:/folder/folder") or go to Session menu-> Set Working Directory ->Choose Directory
+
+```{r}
+setwd("~/Desktop/Investigacion Operativa II/Machine Learning/R/T01 - Data Frames")
+```
+
+
+## Second step: Load the data
+Load the file people-example.csv that needs to be saved in the working directory. You will use the function read.csv. Save the information in a variable called datos. This variable will be a data frame.
+
+```{r}
+people.example <- read.csv("~/Desktop/Investigacion Operativa II/Machine Learning/R/T01 - Data Frames/people-example.csv")
+View(people.example)
+```
+
+The structure of the data frame can be seen by using str() function.
+
+
+```{r}
+str(people.example)
+```
+
+## Third step: Inspect the dataframe
+
+Let's use some operations to check on the dataframe
+
+Use the function head to see the first elements of the data frame
+
+```{r} 
+head(people.example)
+```
+
+
+Use the function tail to see the last elements of the data frame
+
+```{r}
+tail(people.example)
+```
+
+
+If you want to filter a specific column, for example Country column
+```{r}
+View(people.example$Country)
+```
+
+If you want to filter using more than one column, for example First.Name, Country and age columns
+```{r}
+df <- data.frame(people.example)
+cols <- data.frame(df$First.Name,df$Country,df$age)
+View(cols)
+```
+
+Calculate the max age value and its mean
+```{r}
+max(people.example$age)
+mean(people.example$age)
+
+```
+
+Use summary function to summary data frame statistics
+```{r}
+summary(people.example)
+```
+
+
+# Operations with the dataframe itself
+## Rename columns
+Use rename function to change the names of First.Name and Last.Name columns. Use First and Last instead.
+```{r}
+# Load plyr package in order to use rename function
+library(plyr)
+library(magrittr)
+# Add your code
+
+names(df)[names(df) == "First.Name"] <- "First"
+names(df)[names(df) == "Last.Name"] <- "Last"
+
+colnames(df)
+
+```
+
+##Concatenate String in a new column
+Add a new column in the data frame, called FullName, which will include the name and last name.
+
+```{r}
+# Add your code
+FullName <- paste(df$First, df$Last)
+newdf = cbind(df,FullName)
+View(newdf)
+
+```
+
+## Removing columns
+```{r}
+# Will delete the column I just added
+newdf$FullName <- NULL
+View(newdf)
+```
+## Editing columns and programming
+Making changes in the columns is usual in Data Science. Let's make a function to substract 50000 dollars in taxes to the ones who earns more than 300000 dollars.
+There are two different ways of doing this: 1) using loops or 2) using apply family functions. Please, try both of them!
+
+Option 1: Using loops
+
+
+
+```{r}
+for(i in length(df$Savings)){
+  if(df[i,5] > 300000){
+    df[i,5] = df[i,5] - 50000
+  }
+}
+View(df[,5])
+
+
+```
+
+
+
+Option 2: Using apply family functions (see Quick R Tutorial)
+
+
+
+```{r}
+changeSavings<-function(saving){
+  if(saving > 300000){
+    saving = saving - 50000
+  } else {
+    saving = saving
+  }
+}
+
+```
+
+And now we are going to test our function before using it with the data frame
+ 
+```{r}
+a=changeSavings(5000000)
+a
+b=changeSavings(500)
+b
+```
+
+Once we have tested the function works correctly, you will apply it to the data frame using sapply function.
+
+```{r}
+ #Add your code
+lapply(df$Savings, changeSavings)
+```
+
+
+
+#Sorting values
+Sort the values of the data frame by age column.
+
+```{r}
+#Add your code
+ascending_age <- df[order(df$age),]
+
+```
+
+
+# Done!!
